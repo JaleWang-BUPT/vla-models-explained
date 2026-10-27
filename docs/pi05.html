@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>π0.5：异构共训与开放世界泛化</title>
+<style>
+:root{--bg:#faf9f5;--bg-soft:#f0eee6;--card:#ffffff;--fg:#1f1e1d;--mut:#6e6b64;--faint:#87847e;--line:#e5e1d8;--line-strong:#d9d3c5;--acc:#c96442;--acc-strong:#b04f31;--ok:#71855c;--warn:#a1732c;--bad:#b15b4c}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.85 Georgia,"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",serif}
+::selection{background:#f2d8cc}
+main{max-width:860px;margin:0 auto;padding:34px 20px 90px}
+h1,h2,h3,.top .brand{font-family:Georgia,"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",serif;font-weight:600}
+h1{font-size:31px;line-height:1.3;margin:.3em 0 .2em}
+.kicker{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);margin:1.2em 0 .2em}
+h2{font-size:22px;margin:2.6em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+h3{font-size:18.5px;margin:1.9em 0 .5em}
+p{margin:.8em 0}
+a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline;color:var(--acc-strong)}
+code{background:var(--bg-soft);border:1px solid var(--line);border-radius:5px;padding:.05em .4em;font-size:.88em;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+hr{border:none;border-top:1px solid var(--line);margin:2.4em 0}
+ul,ol{padding-left:1.5em}li{margin:.35em 0}
+blockquote{margin:1.2em 0;padding:2px 18px;border-left:3px solid var(--acc);background:var(--bg-soft);border-radius:0 10px 10px 0;color:#4a463c}
+.note{background:var(--bg-soft);border-left:3px solid var(--acc);border-radius:0 10px 10px 0;padding:12px 18px;margin:16px 0;font-size:15.5px;color:#4a463c;line-height:1.75}
+.top{border-bottom:1px solid var(--line);background:var(--bg-soft)}
+.top nav{max-width:860px;margin:0 auto;padding:15px 20px;display:flex;gap:20px;align-items:baseline;flex-wrap:wrap}
+.top .brand{font-weight:700;font-size:16.5px;color:var(--fg)}
+.top .brand::before{content:'✳ ';color:var(--acc)}
+.top a{font-size:14.5px;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--mut)}
+.top a:hover{color:var(--acc)}
+footer{border-top:1px solid var(--line);margin-top:70px;background:var(--bg-soft)}
+footer div{max-width:860px;margin:0 auto;padding:20px;color:var(--faint);font-size:13.5px;line-height:1.7}
+/* 图与视频 */
+figure{margin:1.6em 0;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 14px 10px;box-shadow:0 1px 2px rgba(60,50,30,.04);text-align:center}
+figure img,figure video{max-width:100%;border-radius:8px;display:block;margin:0 auto}
+figure img{background:#fff}
+figcaption{font-size:13.5px;color:var(--faint);line-height:1.65;padding:10px 6px 2px;text-align:left;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+figcaption b{color:var(--mut)}
+video{width:100%;background:#111}
+figure.duo{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
+figure.duo figcaption{grid-column:1/-1}
+@media(max-width:640px){figure.duo{grid-template-columns:1fr}}
+/* 自制动画框 */
+.anim{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 14px 8px;margin:1.6em 0;text-align:center}
+.anim svg{max-width:100%;height:auto}
+/* 卡片与表 */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin:1.6em 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:0 1px 2px rgba(60,50,30,.04)}
+.card h3{margin:.1em 0 .35em;font-size:17px}
+.card a{color:var(--fg)} .card a:hover{color:var(--acc)}
+.card .meta{color:var(--faint);font-size:13.5px;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+table{border-collapse:collapse;width:100%;margin:1.4em 0;font-size:15px;background:var(--card);border-radius:12px;overflow:hidden}
+th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top;line-height:1.6}
+th{background:var(--bg-soft);font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:13.5px;color:var(--mut)}
+/* 时间线 */
+.timeline{list-style:none;padding:0;margin:1.8em 0;border-left:2px solid var(--line-strong)}
+.timeline li{margin:0 0 1.4em;padding:0 0 0 22px;position:relative}
+.timeline li::before{content:'';position:absolute;left:-7px;top:.55em;width:12px;height:12px;border-radius:50%;background:var(--acc);border:2.5px solid var(--bg)}
+.timeline .yr{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-weight:700;color:var(--acc);font-size:14px}
+/* 卷间导航 */
+.model-nav{display:flex;flex-wrap:wrap;gap:14px;margin:26px 0;font-size:14.5px;justify-content:space-between}
+.badge{display:inline-block;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:11.5px;font-weight:700;border-radius:6px;padding:1px 8px;color:#fff;vertical-align:2px}
+.b-new{background:var(--acc)} .b-oss{background:var(--ok)} .b-rl{background:var(--bad)}
+.toc{background:var(--bg-soft);border-radius:12px;padding:14px 20px;margin:1.6em 0;font-size:15px}
+.toc ol{margin:.3em 0}
+p,li,figcaption{overflow-wrap:anywhere}
+@media(max-width:640px){main{padding:22px 14px 60px}h1{font-size:25px}}
+</style>
+</head>
+<body>
+<div class="top"><nav><span class="brand">VLA 模型图解</span><a href="./">总览</a><a href="./index.html">总览</a><a href="./diffusion-policy.html">Diffusion Policy</a><a href="./pi0.html">π0</a><a href="./smolvla.html">SmolVLA</a><a href="./pistar06.html">π*0.6</a><a href="./pi07.html">π0.7</a><a href="https://github.com/JaleWang-BUPT/vla-models-explained" target="_blank" rel="noopener">GitHub</a></nav></div>
+<main>
+
+<p class="kicker">2025 · PHYSICAL INTELLIGENCE</p>
+<h1>π0.5</h1>
+<p>π0.5 的目标不是新技能，而是<b>泛化到全新环境</b>：在训练时从没见过的家庭里整理厨房、收拾卧室。方法主轴是<b>异构数据共训（co-training）</b>——因为 VLA 源自 VLM，训练样本可以是动作、图像、文本、检测框的任意组合。</p>
+
+<div class="anim">
+<svg viewBox="0 0 640 240" role="img" aria-label="异构共训动画">
+  <defs><path id="f1" d="M170,60 C300,60 330,95 430,110"/><path id="f2" d="M170,105 C300,105 340,112 430,118"/><path id="f3" d="M170,150 C300,150 340,128 430,126"/><path id="f4" d="M170,195 C300,195 330,140 430,134"/></defs>
+  
+    <rect x="20" y="46" width="150" height="34" rx="9" fill="#f0eee6" stroke="#d9d3c5"/>
+    <text x="95" y="68" text-anchor="middle" font-size="13" fill="#1f1e1d">多本体真机演示</text>
+    <use href="#f1" stroke="#c96442" stroke-width="2" fill="none" stroke-dasharray="7 8">
+      <animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.6s" repeatCount="indefinite"/>
+    </use>
+    <rect x="20" y="91" width="150" height="34" rx="9" fill="#f0eee6" stroke="#d9d3c5"/>
+    <text x="95" y="113" text-anchor="middle" font-size="13" fill="#1f1e1d">网络多模态数据</text>
+    <use href="#f2" stroke="#c96442" stroke-width="2" fill="none" stroke-dasharray="7 8">
+      <animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.6s" repeatCount="indefinite"/>
+    </use>
+    <rect x="20" y="136" width="150" height="34" rx="9" fill="#f0eee6" stroke="#d9d3c5"/>
+    <text x="95" y="158" text-anchor="middle" font-size="13" fill="#1f1e1d">语义标注（检测/指代）</text>
+    <use href="#f3" stroke="#c96442" stroke-width="2" fill="none" stroke-dasharray="7 8">
+      <animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.6s" repeatCount="indefinite"/>
+    </use>
+    <rect x="20" y="181" width="150" height="34" rx="9" fill="#f0eee6" stroke="#d9d3c5"/>
+    <text x="95" y="203" text-anchor="middle" font-size="13" fill="#1f1e1d">高层子任务标注</text>
+    <use href="#f4" stroke="#c96442" stroke-width="2" fill="none" stroke-dasharray="7 8">
+      <animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.6s" repeatCount="indefinite"/>
+    </use>
+  <rect x="430" y="86" width="170" height="76" rx="14" fill="#ffffff" stroke="#c96442" stroke-width="2"/>
+  <text x="515" y="118" text-anchor="middle" font-size="15" fill="#1f1e1d">VLA 共训</text>
+  <text x="515" y="142" text-anchor="middle" font-size="12" fill="#6e6b64">动作 + 文本 + 检测 + 指代</text>
+  <text x="60" y="232" font-size="12.5" fill="#87847e">混合训练让一个模型既会“做”，也懂任务的语义结构与高层步骤</text>
+</svg></div>
+<h2>共训都混了什么</h2>
+<p>官方博客把提示/标注形态画成了四类，正对应本站下载的四张官方图：</p>
+<figure class="duo"><img src="./assets/pi05_verbal.jpg" loading="lazy" alt=""><figcaption><b>图 1 · 语言指令条件</b>（图片来源：Physical Intelligence 官方博客 <i>π0.5</i>，版权归原作者）</figcaption></figure>
+<figure class="duo"><img src="./assets/pi05_subtask.jpg" loading="lazy" alt=""><figcaption><b>图 2 · 高层子任务命令</b>：模型先生成“做什么阶段”的语义命令，再执行（图片来源同上）</figcaption></figure>
+<figure class="duo"><img src="./assets/pi05_detection.jpg" loading="lazy" alt=""><figcaption><b>图 3 · 物体检测/指代标注</b>（图片来源同上）</figcaption></figure>
+<figure class="duo"><img src="./assets/pi05_web.jpg" loading="lazy" alt=""><figcaption><b>图 4 · 网络多模态数据</b>：把互联网图文任务混进机器人训练（图片来源同上）</figcaption></figure>
+<h2>为什么共训有效</h2>
+<p>共训教会模型三件事：<b>怎么动</b>（多本体真机数据）、<b>任务的语义结构</b>（收拾厨房意味着哪些物体该去哪）、<b>高层步骤</b>（铺床分几步）。高层子任务生成分两阶段推理：先出语义子目标文本，再生成连续动作——长程任务被切成短程可执行段。</p>
+<h2>结果与研究者注记</h2>
+<blockquote>①评测在完全没见过的家庭里做（airbnb 等），任务从“把盘子放进水槽”到“用海绵擦溅洒”，失败常见但展现出类人的灵活应变——这是“泛化”第一次成为 VLA 的主指标。②共训的思路后来被 π0.7 推到极致：数据五花八门没问题，只要提示里的条件能“消毒”。③四类条件图值得反复看：它们就是提示工程在机器人里的形态。</blockquote>
+<p><b>参考</b>：Physical Intelligence, <i>π0.5: a Vision-Language-Action Model with Open-World Generalization</i>（<a href="https://arxiv.org/abs/2504.16054" target="_blank" rel="noopener">arXiv:2504.16054</a> · <a href="https://www.pi.website/blog/pi05" target="_blank" rel="noopener">官方博客</a>）</p>
+
+<nav class="model-nav"><span><a href="./pi0.html">← π0</a></span><span><a href="./smolvla.html">SmolVLA →</a></span></nav>
+</main>
+<footer><div>本站是研究笔记，非官方资料；方法描述以各论文/官方博客为准，图片与视频版权归原作者（见各图注与 <a href="./credits.html">Credits</a>）。文本与自制动画以 MIT 协议提供 · <a href="https://github.com/JaleWang-BUPT/vla-models-explained" target="_blank" rel="noopener">GitHub 仓库</a></div></footer>
+</body>
+</html>

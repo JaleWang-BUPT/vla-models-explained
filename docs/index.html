@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VLA 模型图解 · 从 Diffusion Policy 到 π0.7</title>
+<style>
+:root{--bg:#faf9f5;--bg-soft:#f0eee6;--card:#ffffff;--fg:#1f1e1d;--mut:#6e6b64;--faint:#87847e;--line:#e5e1d8;--line-strong:#d9d3c5;--acc:#c96442;--acc-strong:#b04f31;--ok:#71855c;--warn:#a1732c;--bad:#b15b4c}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.85 Georgia,"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",serif}
+::selection{background:#f2d8cc}
+main{max-width:860px;margin:0 auto;padding:34px 20px 90px}
+h1,h2,h3,.top .brand{font-family:Georgia,"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",serif;font-weight:600}
+h1{font-size:31px;line-height:1.3;margin:.3em 0 .2em}
+.kicker{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);margin:1.2em 0 .2em}
+h2{font-size:22px;margin:2.6em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+h3{font-size:18.5px;margin:1.9em 0 .5em}
+p{margin:.8em 0}
+a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline;color:var(--acc-strong)}
+code{background:var(--bg-soft);border:1px solid var(--line);border-radius:5px;padding:.05em .4em;font-size:.88em;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+hr{border:none;border-top:1px solid var(--line);margin:2.4em 0}
+ul,ol{padding-left:1.5em}li{margin:.35em 0}
+blockquote{margin:1.2em 0;padding:2px 18px;border-left:3px solid var(--acc);background:var(--bg-soft);border-radius:0 10px 10px 0;color:#4a463c}
+.note{background:var(--bg-soft);border-left:3px solid var(--acc);border-radius:0 10px 10px 0;padding:12px 18px;margin:16px 0;font-size:15.5px;color:#4a463c;line-height:1.75}
+.top{border-bottom:1px solid var(--line);background:var(--bg-soft)}
+.top nav{max-width:860px;margin:0 auto;padding:15px 20px;display:flex;gap:20px;align-items:baseline;flex-wrap:wrap}
+.top .brand{font-weight:700;font-size:16.5px;color:var(--fg)}
+.top .brand::before{content:'✳ ';color:var(--acc)}
+.top a{font-size:14.5px;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--mut)}
+.top a:hover{color:var(--acc)}
+footer{border-top:1px solid var(--line);margin-top:70px;background:var(--bg-soft)}
+footer div{max-width:860px;margin:0 auto;padding:20px;color:var(--faint);font-size:13.5px;line-height:1.7}
+/* 图与视频 */
+figure{margin:1.6em 0;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 14px 10px;box-shadow:0 1px 2px rgba(60,50,30,.04);text-align:center}
+figure img,figure video{max-width:100%;border-radius:8px;display:block;margin:0 auto}
+figure img{background:#fff}
+figcaption{font-size:13.5px;color:var(--faint);line-height:1.65;padding:10px 6px 2px;text-align:left;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+figcaption b{color:var(--mut)}
+video{width:100%;background:#111}
+figure.duo{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
+figure.duo figcaption{grid-column:1/-1}
+@media(max-width:640px){figure.duo{grid-template-columns:1fr}}
+/* 自制动画框 */
+.anim{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 14px 8px;margin:1.6em 0;text-align:center}
+.anim svg{max-width:100%;height:auto}
+/* 卡片与表 */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin:1.6em 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:0 1px 2px rgba(60,50,30,.04)}
+.card h3{margin:.1em 0 .35em;font-size:17px}
+.card a{color:var(--fg)} .card a:hover{color:var(--acc)}
+.card .meta{color:var(--faint);font-size:13.5px;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+table{border-collapse:collapse;width:100%;margin:1.4em 0;font-size:15px;background:var(--card);border-radius:12px;overflow:hidden}
+th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top;line-height:1.6}
+th{background:var(--bg-soft);font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:13.5px;color:var(--mut)}
+/* 时间线 */
+.timeline{list-style:none;padding:0;margin:1.8em 0;border-left:2px solid var(--line-strong)}
+.timeline li{margin:0 0 1.4em;padding:0 0 0 22px;position:relative}
+.timeline li::before{content:'';position:absolute;left:-7px;top:.55em;width:12px;height:12px;border-radius:50%;background:var(--acc);border:2.5px solid var(--bg)}
+.timeline .yr{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-weight:700;color:var(--acc);font-size:14px}
+/* 卷间导航 */
+.model-nav{display:flex;flex-wrap:wrap;gap:14px;margin:26px 0;font-size:14.5px;justify-content:space-between}
+.badge{display:inline-block;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:11.5px;font-weight:700;border-radius:6px;padding:1px 8px;color:#fff;vertical-align:2px}
+.b-new{background:var(--acc)} .b-oss{background:var(--ok)} .b-rl{background:var(--bad)}
+.toc{background:var(--bg-soft);border-radius:12px;padding:14px 20px;margin:1.6em 0;font-size:15px}
+.toc ol{margin:.3em 0}
+p,li,figcaption{overflow-wrap:anywhere}
+@media(max-width:640px){main{padding:22px 14px 60px}h1{font-size:25px}}
+</style>
+</head>
+<body>
+<div class="top"><nav><span class="brand">VLA 模型图解</span><a href="./">总览</a><a href="./diffusion-policy.html">Diffusion Policy</a><a href="./pi0.html">π0</a><a href="./pi05.html">π0.5</a><a href="./smolvla.html">SmolVLA</a><a href="./pistar06.html">π*0.6</a><a href="./pi07.html">π0.7</a><a href="https://github.com/JaleWang-BUPT/vla-models-explained" target="_blank" rel="noopener">GitHub</a></nav></div>
+<main>
+
+<p class="kicker">VLA METHODS, VISUALLY</p>
+<h1>从 Diffusion Policy 到 π0.7：VLA 方法图解</h1>
+<p>一份面向研究者的中文图解笔记：沿着“动作怎么生成、数据怎么用、泛化从哪来”三条线，拆解六个代表性模型——<b>Diffusion Policy（2023）→ SmolVLA（2025）→ π0（2024）→ π0.5（2025）→ π*0.6（2025）→ π0.7（2026）</b>。所有论文图与官方动画均已标注出处；条目中的机制动画（✳ 标记）是本站自制的 SVG，可放心引用。</p>
+<div class="note">阅读方式：每页固定结构——问题 → 方法 → 关键设计 → 结果 → 研究者视角的注记（为什么这样设计、还留了什么坑）。想对比先看<a href="#compare">时间线与谱系表</a>。</div>
+<h2 id="timeline">时间线</h2>
+<ul class="timeline">
+  <li><span class="yr">2023 · RSS　</span><b>Diffusion Policy</b>：把“动作生成”变成图像式去噪——动作分布的多模态表达第一次在真机上大规模立住。</li>
+  <li><span class="yr">2024 · π0　</span><b>Physical Intelligence</b>：VLM 主干 + flow matching 动作专家，把互联网语义先验接到 50 Hz 灵巧操作。</li>
+  <li><span class="yr">2025 · π0.5　</span>：异构数据共训（网络多模态 + 多本体），高层子任务生成，泛化到没见过的家庭环境。</li>
+  <li><span class="yr">2025 · SmolVLA　</span><b>Hugging Face</b>：450M 的“小而全”，消费级 GPU 可训、MacBook 可跑，异步推理把延迟藏进执行里。</li>
+  <li><span class="yr">2025 · π*0.6　</span>：RECAP 后训练（演示 + 纠正 + 自主经验），RL 让 VLA 从“偶尔成功”到“全天可靠”。</li>
+  <li><span class="yr">2026 · π0.7　</span>：多样化上下文条件——提示里给“怎么做”（子目标图、元数据、策略），一个通用模型开箱即专家。</li>
+</ul>
+<h2 id="compare">谱系对比表</h2>
+<table>
+<tr><th>模型</th><th>年份</th><th>参数量</th><th>动作头</th><th>训练范式</th><th>开源</th></tr>
+<tr><td><a href="./diffusion-policy.html">Diffusion Policy</a></td><td>2023</td><td>CNN/Transformer 版数亿级</td><td>DDPM 去噪</td><td>模仿学习（行为克隆）</td><td><span class="badge b-oss">开源</span></td></tr>
+<tr><td><a href="./pi0.html">π0</a></td><td>2024</td><td>3.3B（PaliGemma 3B + 专家 300M）</td><td>Flow Matching</td><td>大规模异构预训练 + 微调</td><td><span class="badge b-oss">openpi</span></td></tr>
+<tr><td><a href="./pi05.html">π0.5</a></td><td>2025</td><td>与 π0 同量级</td><td>Flow Matching</td><td>异构共训（含网络多模态数据）</td><td><span class="badge b-oss">openpi</span></td></tr>
+<tr><td><a href="./smolvla.html">SmolVLA</a></td><td>2025</td><td>450M</td><td>Flow Matching（层跳过/异步推理）</td><td>社区数据（LeRobot 生态）</td><td><span class="badge b-oss">开源</span></td></tr>
+<tr><td><a href="./pistar06.html">π*0.6</a></td><td>2025</td><td>π0.6 基座</td><td>Flow Matching + 优势条件</td><td>RECAP：演示 + 纠正 + 自主经验</td><td>未开源</td></tr>
+<tr><td><a href="./pi07.html">π0.7</a></td><td>2026</td><td>π0.6 量级</td><td>Flow Matching + 多模态提示条件</td><td>多样化上下文条件训练</td><td>未开源</td></tr>
+</table>
+<h2>三条研究主线</h2>
+<ol>
+<li><b>动作表示</b>：离散 token（RT-2/OpenVLA 一系）→ 回归 → CVAE（ACT）→ 扩散（Diffusion Policy）→ flow matching（π0 及之后）。生成式的连续分布表达，是高频灵巧操作的地基。</li>
+<li><b>数据复用</b>：单任务演示 → 异构共训（π0.5）→ 社区数据（SmolVLA）→ 自主经验回收（π*0.6）→ 低质量数据经元数据“消毒”后可用（π0.7）。</li>
+<li><b>泛化来源</b>：从“见多识广”（数据规模）走向“条件化”（π0.7 在提示里显式给策略），泛化开始像 LLM 一样可组合。</li>
+</ol>
+
+<nav class="model-nav"><span></span><span></span></nav>
+</main>
+<footer><div>本站是研究笔记，非官方资料；方法描述以各论文/官方博客为准，图片与视频版权归原作者（见各图注与 <a href="./credits.html">Credits</a>）。文本与自制动画以 MIT 协议提供 · <a href="https://github.com/JaleWang-BUPT/vla-models-explained" target="_blank" rel="noopener">GitHub 仓库</a></div></footer>
+</body>
+</html>
