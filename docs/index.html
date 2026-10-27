@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>VLA 模型图解 · 从 Diffusion Policy 到 π0.7</title>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$']]},chtml:{displayAlign:'left'}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
 <style>
 :root{--bg:#faf9f5;--bg-soft:#f0eee6;--card:#ffffff;--fg:#1f1e1d;--mut:#6e6b64;--faint:#87847e;--line:#e5e1d8;--line-strong:#d9d3c5;--acc:#c96442;--acc-strong:#b04f31;--ok:#71855c;--warn:#a1732c;--bad:#b15b4c}
 *{box-sizing:border-box}
@@ -73,33 +75,34 @@ p,li,figcaption{overflow-wrap:anywhere}
 <main>
 
 <p class="kicker">VLA METHODS, VISUALLY</p>
-<h1>从 Diffusion Policy 到 π0.7：VLA 方法图解</h1>
-<p>一份面向研究者的中文图解笔记：沿着“动作怎么生成、数据怎么用、泛化从哪来”三条线，拆解六个代表性模型——<b>Diffusion Policy（2023）→ SmolVLA（2025）→ π0（2024）→ π0.5（2025）→ π*0.6（2025）→ π0.7（2026）</b>。所有论文图与官方动画均已标注出处；条目中的机制动画（✳ 标记）是本站自制的 SVG，可放心引用。</p>
-<div class="note">阅读方式：每页固定结构——问题 → 方法 → 关键设计 → 结果 → 研究者视角的注记（为什么这样设计、还留了什么坑）。想对比先看<a href="#compare">时间线与谱系表</a>。</div>
+<h1>从 Diffusion Policy 到 π0.7：VLA 方法精读图解</h1>
+<p>一份面向研究者的中文精读笔记，沿“<b>动作怎么生成、数据怎么用、泛化从哪来、可靠性怎么建</b>”四条线拆解六个代表性模型：<b>Diffusion Policy（2023）→ π0（2024）→ π0.5（2025）→ SmolVLA（2025）→ π*0.6（2025）→ π0.7（2026）</b>。每页固定结构：问题 → 方法精读（含公式与架构细节）→ 训练与实现 → 结果与消融 → 研究者注记。所有论文图与官方动画逐条署名；机制动画（✳）为本站自制的 SVG/SMIL，零 JS、可自由复用。</p>
+<div class="note">这六个模型恰好构成一条完整的因果链：DP 立住“动作=生成模型”→ π0 把它接进 VLM 与 50Hz 控制 → π0.5 解决场景泛化 → SmolVLA 证明范式可小型化 → π*0.6 用 RL 补可靠性 → π0.7 把前面所有数据源用“条件化”统一起来。读的时候建议对照每页的“研究者注记”。</div>
 <h2 id="timeline">时间线</h2>
 <ul class="timeline">
-  <li><span class="yr">2023 · RSS　</span><b>Diffusion Policy</b>：把“动作生成”变成图像式去噪——动作分布的多模态表达第一次在真机上大规模立住。</li>
-  <li><span class="yr">2024 · π0　</span><b>Physical Intelligence</b>：VLM 主干 + flow matching 动作专家，把互联网语义先验接到 50 Hz 灵巧操作。</li>
-  <li><span class="yr">2025 · π0.5　</span>：异构数据共训（网络多模态 + 多本体），高层子任务生成，泛化到没见过的家庭环境。</li>
-  <li><span class="yr">2025 · SmolVLA　</span><b>Hugging Face</b>：450M 的“小而全”，消费级 GPU 可训、MacBook 可跑，异步推理把延迟藏进执行里。</li>
-  <li><span class="yr">2025 · π*0.6　</span>：RECAP 后训练（演示 + 纠正 + 自主经验），RL 让 VLA 从“偶尔成功”到“全天可靠”。</li>
-  <li><span class="yr">2026 · π0.7　</span>：多样化上下文条件——提示里给“怎么做”（子目标图、元数据、策略），一个通用模型开箱即专家。</li>
+  <li><span class="yr">2023 · RSS　</span><b>Diffusion Policy</b>：把动作生成变成去噪。多模态动作分布的表达第一次在真机上立住，15 个任务平均成功率 60.7%（此前 SOTA 44.6%）。</li>
+  <li><span class="yr">2024 · π0　</span><b>Physical Intelligence</b>：PaliGemma 3B + 300M flow matching 动作专家，7 构型 68 任务 + OXE 全集预训练，把语义先验接到 50Hz 灵巧操作。</li>
+  <li><span class="yr">2025 · π0.5　</span>：异构共训（网络多模态 + 多本体 + 语义标注），推理先出子任务再出动作，泛化到训练时没见过的家庭。</li>
+  <li><span class="yr">2025 · SmolVLA　</span><b>Hugging Face</b>：450M、481 个社区数据集 22.9K episodes 预训练，消费级 GPU 可训；异步推理响应快 30%、吞吐 2×。</li>
+  <li><span class="yr">2025 · π*0.6　</span>：RECAP 后训练（演示 + 纠正 + 自主经验 + 优势条件化），最难任务吞吐翻倍、失败率减半，咖啡做到全天连续。</li>
+  <li><span class="yr">2026 · π0.7　</span>：多样化上下文条件——提示里给“怎么做”（子目标图/元数据/策略），同一模型开箱达到专家特化水平，零样本跨本体叠衬衫。</li>
 </ul>
 <h2 id="compare">谱系对比表</h2>
 <table>
 <tr><th>模型</th><th>年份</th><th>参数量</th><th>动作头</th><th>训练范式</th><th>开源</th></tr>
-<tr><td><a href="./diffusion-policy.html">Diffusion Policy</a></td><td>2023</td><td>CNN/Transformer 版数亿级</td><td>DDPM 去噪</td><td>模仿学习（行为克隆）</td><td><span class="badge b-oss">开源</span></td></tr>
-<tr><td><a href="./pi0.html">π0</a></td><td>2024</td><td>3.3B（PaliGemma 3B + 专家 300M）</td><td>Flow Matching</td><td>大规模异构预训练 + 微调</td><td><span class="badge b-oss">openpi</span></td></tr>
-<tr><td><a href="./pi05.html">π0.5</a></td><td>2025</td><td>与 π0 同量级</td><td>Flow Matching</td><td>异构共训（含网络多模态数据）</td><td><span class="badge b-oss">openpi</span></td></tr>
-<tr><td><a href="./smolvla.html">SmolVLA</a></td><td>2025</td><td>450M</td><td>Flow Matching（层跳过/异步推理）</td><td>社区数据（LeRobot 生态）</td><td><span class="badge b-oss">开源</span></td></tr>
-<tr><td><a href="./pistar06.html">π*0.6</a></td><td>2025</td><td>π0.6 基座</td><td>Flow Matching + 优势条件</td><td>RECAP：演示 + 纠正 + 自主经验</td><td>未开源</td></tr>
+<tr><td><a href="./diffusion-policy.html">Diffusion Policy</a></td><td>2023</td><td>数亿级（CNN/Transformer 两版）</td><td>DDPM 去噪（DDIM 可少步）</td><td>行为克隆（含动作 chunk + 滚动视界）</td><td><span class="badge b-oss">开源</span></td></tr>
+<tr><td><a href="./pi0.html">π0</a></td><td>2024</td><td>3.3B（PaliGemma 3B + 专家 300M）</td><td>Flow Matching（H=50 动作块）</td><td>Transfusion 式多目标预训练 + 微调</td><td><span class="badge b-oss">openpi</span></td></tr>
+<tr><td><a href="./pi05.html">π0.5</a></td><td>2025</td><td>与 π0 同量级</td><td>Flow Matching + 两阶段推理</td><td>异构共训（含网络多模态与语义标注）</td><td><span class="badge b-oss">openpi</span></td></tr>
+<tr><td><a href="./smolvla.html">SmolVLA</a></td><td>2025</td><td>450M</td><td>Flow Matching（n=50，层跳过）</td><td>社区数据（481 集 / 22.9K episodes）</td><td><span class="badge b-oss">开源</span></td></tr>
+<tr><td><a href="./pistar06.html">π*0.6</a></td><td>2025</td><td>π0.6 基座</td><td>Flow Matching + 优势条件化</td><td>RECAP：演示 + 纠正 + 自主经验</td><td>未开源</td></tr>
 <tr><td><a href="./pi07.html">π0.7</a></td><td>2026</td><td>π0.6 量级</td><td>Flow Matching + 多模态提示条件</td><td>多样化上下文条件训练</td><td>未开源</td></tr>
 </table>
-<h2>三条研究主线</h2>
+<h2>四条研究主线</h2>
 <ol>
-<li><b>动作表示</b>：离散 token（RT-2/OpenVLA 一系）→ 回归 → CVAE（ACT）→ 扩散（Diffusion Policy）→ flow matching（π0 及之后）。生成式的连续分布表达，是高频灵巧操作的地基。</li>
-<li><b>数据复用</b>：单任务演示 → 异构共训（π0.5）→ 社区数据（SmolVLA）→ 自主经验回收（π*0.6）→ 低质量数据经元数据“消毒”后可用（π0.7）。</li>
-<li><b>泛化来源</b>：从“见多识广”（数据规模）走向“条件化”（π0.7 在提示里显式给策略），泛化开始像 LLM 一样可组合。</li>
+<li><b>动作表示</b>：离散 token（RT-2/OpenVLA 一系）→ 回归 → CVAE（ACT）→ 扩散（Diffusion Policy）→ flow matching（π0 及之后全部）。判据有三：分布表达力（多模态）、推理步数可调（延迟换精度）、对高频连续控制的适配（50Hz 级动作点）。</li>
+<li><b>数据复用</b>：单任务演示 → 异构共训（π0.5：网络数据 + 语义标注）→ 社区数据（SmolVLA：10.6M 帧）→ 自主经验回收（π*0.6：价值函数当标签）→ 低质量数据经元数据“消毒”后入库（π0.7）。</li>
+<li><b>泛化来源</b>：π0.5 靠“见多”（地点规模曲线持续上升）→ π0.7 靠“条件化”（把数据差异显式写进提示），组合泛化开始像 LLM。</li>
+<li><b>可靠性</b>：模仿学习的小错误会复合（π*0.6 页的 Portafilter 案例）→ 价值函数给经验打标签 → 优势条件化让策略“优于训练数据”。</li>
 </ol>
 
 <nav class="model-nav"><span></span><span></span></nav>

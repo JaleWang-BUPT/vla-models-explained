@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>π0.7：可转向的通用主义模型</title>
+<title>π0.7：可转向的通用主义模型（精读）</title>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$']]},chtml:{displayAlign:'left'}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
 <style>
 :root{--bg:#faf9f5;--bg-soft:#f0eee6;--card:#ffffff;--fg:#1f1e1d;--mut:#6e6b64;--faint:#87847e;--line:#e5e1d8;--line-strong:#d9d3c5;--acc:#c96442;--acc-strong:#b04f31;--ok:#71855c;--warn:#a1732c;--bad:#b15b4c}
 *{box-sizing:border-box}
@@ -73,8 +75,17 @@ p,li,figcaption{overflow-wrap:anywhere}
 <main>
 
 <p class="kicker">2026 · PHYSICAL INTELLIGENCE · STEERABLE GENERALIST</p>
-<h1>π0.7</h1>
-<p>π0.7（2026 年 4 月）的关键词是 <b>diverse context conditioning</b>：过去 VLA 的提示只有“做什么”（语言指令），π0.7 把<b>“怎么做”也写进提示</b>——子目标图像、任务表现的元数据（快慢、质量高低）、策略描述，全部作为多模态条件参与训练。泛化逻辑由此改变：数据五花八门不再是噪声，而是被条件区分开的<b>不同策略</b>。</p>
+<h1>π0.7 精读</h1>
+<h2>1. 问题：组合泛化为什么在 VLA 里迟迟没出现</h2>
+<p>LLM 的标志性能力是<b>重组</b>：会英译法 + 会输出 JSON，就能输出 JSON 格式的翻译。VLA 能理解丰富的语义概念，却一直做不到“把学过的技能组合起来解决新任务”——比如用一件训练时没见过的厨房电器。此前哪怕训练中见过的技能，想用好也都要按任务微调，“通用模型开箱即专家”停留在愿景。π0.7（2026-04）展示的正是这个愿景的第一批实证。</p>
+<h2>2. 方法精读：多样化上下文条件</h2>
+<p>核心论断：<b>naive 地混合多源数据不会带来好的泛化；泛化的关键是把“怎么做的差异”写进提示</b>。π0.7 的提示除语言指令外，还包括：</p>
+<ul>
+<li><b>子目标图像（subgoal images）</b>：定义“当前子步骤结束时物体该被摆成什么样”的精确空间布局；</li>
+<li><b>元数据（metadata）</b>：episode 的期望时长（做得多快）、质量标注（好/差）——次优的自主评测数据标注上“低质量/低速”后<b>就能入库而不会教坏模型</b>；</li>
+<li><b>策略描述</b>：文本化的执行策略。</li>
+</ul>
+<p>测试时模型接受标准语言指令，但也接受期望策略信息、甚至由<b>轻量世界模型合成的视觉子目标</b>——世界模型在这里的角色是“提示生成器”，为没有真值子目标的任务提供视觉条件。</p>
 
 <div class="anim">
 <svg viewBox="0 0 640 250" role="img" aria-label="条件化转向动画">
@@ -97,22 +108,23 @@ p,li,figcaption{overflow-wrap:anywhere}
   <text x="596" y="190" font-size="11.5" fill="#a1732c">策略 C</text>
   <text x="60" y="240" font-size="12.5" fill="#87847e">提示里多给“怎么做”的信息，同一个模型就能被精确转向：异构数据不再互相打架</text>
 </svg></div>
-<h2>提示里都有什么</h2>
-<p>官方博客的示例子目标图（subgoal）与当前观测（current）成对出现——子目标定义“物体该被摆成什么样”的精确空间布局：</p>
+<h2>3. 数据侧：把 π*0.6 的经验变成通用训练数据</h2>
+<p>训练数据横跨<b>多机器人、人类数据、以及各策略跑出的自主 episode</b>。关键的缝合技巧：把 π*0.6 经 RECAP 产生的自主经验<b>带策略元数据</b>并入 π0.7 训练——同一批“特化模型的经验”就这样变成“通用模型的通识”。</p>
 <figure class="duo"><img src="./assets/pi07_subgoal_1.png" loading="lazy" alt=""><figcaption><b>图 · 子目标图像（期望终态）</b>（图片来源：Physical Intelligence 官方博客 <i>π0.7</i>，版权归原作者）</figcaption></figure>
-<figure class="duo"><img src="./assets/pi07_current_1.png" loading="lazy" alt=""><figcaption><b>图 · 当前观测（起始状态）</b>：模型的条件 = 语言 + 子目标 + 元数据（图片来源同上）</figcaption></figure>
+<figure class="duo"><img src="./assets/pi07_current_1.png" loading="lazy" alt=""><figcaption><b>图 · 当前观测（起始状态）</b>：条件 = 语言 + 子目标 + 元数据（图片来源同上）</figcaption></figure>
 <figure class="duo"><img src="./assets/pi07_subgoal_3.png" loading="lazy" alt=""><figcaption><b>图 · 另一组子目标示例</b>（图片来源同上）</figcaption></figure>
 <figure class="duo"><img src="./assets/pi07_current_3.png" loading="lazy" alt=""><figcaption><b>图 · 对应当前观测</b>（图片来源同上）</figcaption></figure>
-<h2>三个涌现能力</h2>
-<ol>
-<li><b>开箱即专家</b>：把 π*0.6 用 RECAP 产出的自主经验带策略元数据并入训练后，同一个 π0.7 在叠衣、咖啡、装盒上达到甚至超过专门 RL 微调的专家模型——不再需要“一个任务一个特化模型”。</li>
-<li><b>技能组合</b>：像 LLM 组合概念一样组合技能——使用训练里没见过的厨房电器、完成多阶段任务。</li>
-<li><b>零样本跨本体</b>：对训练中欠 represented 的双臂 UR5e 平台，零样本完成衬衫折叠（下方官方视频）。</li>
-</ol>
-<figure><video src="./assets/pi07_shirt_fold.mp4" controls playsinline preload="metadata"></video><figcaption><b>视频 · 零样本跨本体衬衫折叠（双臂 UR5e）</b>（视频来源：Physical Intelligence 官方博客 <i>π0.7</i>，版权归原作者）</figcaption></figure>
-<figure><video src="./assets/pi07_coaching.mp4" controls playsinline preload="metadata"></video><figcaption><b>视频 · “粗纠正”转向示例</b>：提示中的策略信息改变执行风格（视频来源同上）</figcaption></figure>
-<h2>研究者注记</h2>
-<blockquote>①π0.7 的深层主张：泛化不靠“更多同质数据”，靠“条件化消化异质数据”——低质量演示标注上“低质量/低速”元数据就能入库，数据护城河被重新定义。②测试时的子目标可以由<b>轻量世界模型合成</b>——世界模型在这里不是路线之争，而是提示生成器。③对比 π*0.6：RECAP 靠 RL 建立可靠性，π0.7 靠条件化把可靠性变成通用能力的一部分；两条线在 π0.7 汇合。④开放问题：子目标图谁来给？测试时世界模型合成的保真度，就是新的能力上界。</blockquote>
+<h2>4. 三个涌现能力与数字</h2>
+<h3>4.1 开箱即专家</h3>
+<p>在叠衣（T-Shirts & Shorts / Diverse-Hardest Item 两档难度）、咖啡制作、装盒任务组上，单个 π0.7 的吞吐（按专家特化模型归一化）达到<b>持平或更高</b>，成功率相当——即“通用模型 ≥ 特化模型”，这是“开箱即专家”主张的直接证据。</p>
+<h3>4.2 语言教练（language coaching）</h3>
+<p>面对没见过的厨房电器（空气炸锅），机器人收到的是<b>逐步语言命令</b>——和指导第一次用电器的人一样。之后把高层策略微调成“自动生成语言子任务”的版本，<b>无需任何额外遥操作</b>，任务的全自主执行显著改善——机器人实际上“从语言教练那里学会了任务”。页面可视化里还能看到世界模型合成的子目标图逐步变化。</p>
+<figure><video src="./assets/pi07_coaching.mp4" controls playsinline preload="metadata"></video><figcaption><b>视频 · 空气炸锅任务的语言教练与子目标可视化</b>（视频来源：Physical Intelligence 官方博客 <i>π0.7</i>，版权归原作者）</figcaption></figure>
+<h3>4.3 零样本跨本体</h3>
+<p>训练集中最欠 represented 的本体之一是<b>双臂 UR5e 系统</b>（两台 UR5e 工业臂 + Robotiq 平行夹爪）——臂重大惯量大、夹爪精度低、极难遥操作。π0.7 在这台机器人上零样本叠衣（无任何该本体的叠衣数据），成功率<b>与“首次在这台机器人上做该任务的人类专家遥操作者”持平</b>。</p>
+<figure><video src="./assets/pi07_shirt_fold.mp4" controls playsinline preload="metadata"></video><figcaption><b>视频 · 零样本跨本体衬衫折叠（双臂 UR5e）</b>（视频来源同上）</figcaption></figure>
+<h2>5. 研究者注记</h2>
+<blockquote>①π0.7 的深层主张是数据护城河的重新定义：泛化不靠“更多同质数据”，靠“条件化消化异质数据”——低质量数据从负资产变成（带标注的）资产，数据工程的重心从“采好数据”移到“把数据之间的差异写清楚”。②世界模型路线之争在这里被降维：世界模型不必是“另一个大模型路线”，它可以是 VLA 的子目标生成器——一条轻量的融合路径。③开放问题：子目标合成的保真度成为新上界；元数据标注从哪来（人工/自动评测）是数据管线的下一个瓶颈；RECAP 经验的“策略元数据”具体形式官方未完全公开。</blockquote>
 <p><b>参考</b>：Physical Intelligence, <i>π0.7: a Steerable Generalist Robotic Foundation Model with Emergent Capabilities</i>（<a href="https://www.pi.website/blog/pi07" target="_blank" rel="noopener">官方博客</a>，2026-04）</p>
 
 <nav class="model-nav"><span><a href="./pistar06.html">← π*0.6</a></span><span><a href="./index.html">总览 →</a></span></nav>

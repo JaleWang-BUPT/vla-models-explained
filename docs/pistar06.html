@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>π*0.6：RECAP——用 RL 把 VLA 磨到全天可靠</title>
+<title>π*0.6：RECAP——用 RL 把 VLA 磨到全天可靠（精读）</title>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$']]},chtml:{displayAlign:'left'}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
 <style>
 :root{--bg:#faf9f5;--bg-soft:#f0eee6;--card:#ffffff;--fg:#1f1e1d;--mut:#6e6b64;--faint:#87847e;--line:#e5e1d8;--line-strong:#d9d3c5;--acc:#c96442;--acc-strong:#b04f31;--ok:#71855c;--warn:#a1732c;--bad:#b15b4c}
 *{box-sizing:border-box}
@@ -73,8 +75,9 @@ p,li,figcaption{overflow-wrap:anywhere}
 <main>
 
 <p class="kicker">2025 · PHYSICAL INTELLIGENCE · RL 后训练</p>
-<h1>π*0.6 与 RECAP</h1>
-<p>模仿学习的阿喀琉斯之踵：<b>小错误会复合</b>。VLA 在真机上犯一个小错，环境就进入训练分布外的状态，接着犯更大的错——LLM 输出错了可以重来，机器人错了物理世界不等人。所以 VLA“偶尔成功容易，持续可靠很难”。π*0.6 用一套叫 <b>RECAP</b>（RL with Experience & Corrections via Advantage-conditioned Policies）的后训练方法解决这个问题。</p>
+<h1>π*0.6 与 RECAP 精读</h1>
+<h2>1. 问题：从“偶尔成功”到“持续可靠”的鸿沟</h2>
+<p>模仿学习的失败模式有清晰的机制：<b>误差复合</b>。VLA 犯一个小错（比如以错误角度抓住咖啡机手柄），环境随即进入训练分布外的状态，下一步更容易犯错——而<b>真正的失败原因可能发生在几步之前</b>，监督学习只在“当时正确”的轨迹上训练，永远不会修正这种早期偏差。LLM 输出错了可以重来，机器人错了物理世界不等人：所以 VLA“偶尔成功容易，持续可靠很难”。π*0.6（π0.6 基座 + RECAP 后训练）给出了一套可复制的解法。</p>
 
 <div class="anim">
 <svg viewBox="0 0 640 250" role="img" aria-label="RECAP 循环动画">
@@ -85,34 +88,37 @@ p,li,figcaption{overflow-wrap:anywhere}
   </defs>
   
     <circle cx="210" cy="90" r="44" fill="#ffffff" stroke="#71855c" stroke-width="2.4"/>
-    <text x="210" y="88" text-anchor="middle" font-size="13.5" fill="#1f1e1d">演示数据</text>
-    <text x="210" y="106" text-anchor="middle" font-size="11" fill="#6e6b64"></text>
+    <text x="210" y="88" text-anchor="middle" font-size="13.5" fill="#1f1e1d">演示</text>
+    <text x="210" y="106" text-anchor="middle" font-size="11" fill="#6e6b64">Demo</text>
     <circle cx="470" cy="95" r="44" fill="#ffffff" stroke="#a1732c" stroke-width="2.4"/>
     <text x="470" y="93" text-anchor="middle" font-size="13.5" fill="#1f1e1d">纠正</text>
-    <text x="470" y="111" text-anchor="middle" font-size="11" fill="#6e6b64">教练</text>
+    <text x="470" y="111" text-anchor="middle" font-size="11" fill="#6e6b64">Coach</text>
     <circle cx="300" cy="190" r="44" fill="#ffffff" stroke="#c96442" stroke-width="2.4"/>
     <text x="300" y="188" text-anchor="middle" font-size="13.5" fill="#1f1e1d">自主经验</text>
-    <text x="300" y="206" text-anchor="middle" font-size="11" fill="#6e6b64"></text>
+    <text x="300" y="206" text-anchor="middle" font-size="11" fill="#6e6b64">Explore</text>
   <use href="#rc1" stroke="#71855c" stroke-width="2.2" fill="none" stroke-dasharray="8 7"><animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.5s" repeatCount="indefinite"/></use>
   <use href="#rc2" stroke="#a1732c" stroke-width="2.2" fill="none" stroke-dasharray="8 7"><animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.5s" repeatCount="indefinite"/></use>
   <use href="#rc3" stroke="#c96442" stroke-width="2.2" fill="none" stroke-dasharray="8 7"><animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.5s" repeatCount="indefinite"/></use>
   <circle r="5" fill="#1f1e1d"><animateMotion dur="4.5s" repeatCount="indefinite" path="M250,70 C350,45 460,55 545,95 C520,190 420,215 330,200 C210,175 140,130 135,85 C160,55 210,58 250,70"/></circle>
   <text x="320" y="242" text-anchor="middle" font-size="12.5" fill="#87847e">价值函数估计回报，优势（advantage）作为条件反哺策略：好动作被强化，差动作被规避</text>
 </svg></div>
-<h2>RECAP 三步</h2>
-<ol>
-<li><b>演示（demonstrations）</b>：人类遥操数据打底，教会任务骨架。</li>
-<li><b>纠正（corrections）</b>：在策略跑偏时由操作者“接手拉回”，这些纠正段是高价值数据——它们包含从错误状态回到正轨的配对。</li>
-<li><b>自主经验（autonomous experience）</b>：让当前策略大量自主尝试；训一个<b>价值函数</b>估计各段动作的回报，把<b>优势（advantage）作为条件</b>喂回策略——好动作被相对强化，坏动作被显式规避。</li>
-</ol>
+<h2>2. RECAP 精读（RL with Experience & Corrections via Advantage-conditioned Policies）</h2>
+<h3>2.1 价值函数：给“坏经验”打标签</h3>
+<p>自主经验数据的问题是<b>没有真值标签</b>——照抄自己的失败毫无意义。RECAP 训一个<b>价值函数</b>：预测“当前处境相对其他处境有多好”（博客用棋局类比：预测从当前盘面赢棋的概率）。有了它，就能对一段自主 rollout 做回溯归因——哪怕失败发生在最后一步，也能把“以错误角度抓 Portafilter”标记为错误。信用分配问题（早期错误、晚期暴露）由此被价值函数的回溯性质解决。</p>
+<h3>2.2 优势条件化：策略优于训练数据</h3>
+<p>“价值的相对变化”在 RL 里叫<b>优势（advantage）</b>。RECAP 的独特之处是把优势<b>作为条件输入策略</b>（advantage-conditioned），而不只是当加权系数：执行时直接要求 VLA “执行高优势动作”。这样学出的策略<b>可以优于产生它数据的平均质量</b>——数据里好坏混合，条件化让模型学会在推理时选择好的一端。</p>
+<h3>2.3 三个数据来源，两种“坏数据”的好用法</h3>
+<p>RECAP 训练数据 = <b>演示</b>（遥操作打底）+ <b>纠正</b>（专家在策略跑偏时接手拉回——含“如何修复错误/做得更好”的信息）+ <b>自主经验</b>（价值函数打标签）。博客强调的两个技巧：纠正数据教会“从错误恢复”，自主数据教会“不犯第一次错”——两种“坏经验”都被转化成训练信号。</p>
 <figure><video src="./assets/pistar06_coffee.mp4" controls playsinline preload="metadata"></video><figcaption><b>视频 · RECAP 训练后的咖啡制作</b>（视频来源：Physical Intelligence 官方博客 <i>π*0.6</i>，版权归原作者）</figcaption></figure>
-<h2>结果</h2>
+<h2>3. 结果</h2>
 <ul>
-<li>最难的几个任务吞吐量 <b>提升 2 倍以上</b>，失败率至少减半；</li>
-<li>咖啡制作从早晨 5:30 连续跑到晚上 11:30；新家里叠 50 件没见过的衣物数小时不中断；真实工厂里装配并贴标 59 个巧克力包装盒。</li>
+<li>最难任务的吞吐量 <b>翻倍以上</b>，失败率<b>至少减半</b>；</li>
+<li>咖啡制作从 <b>5:30am 连续跑到 11:30pm</b>（全天商用时段）；</li>
+<li><b>新家叠 50 件未见衣物</b>数小时不中断；真实工厂里装配并贴标 <b>59 个巧克力包装盒</b>；</li>
+<li>三段未剪辑长视频全部公开（官方博客“Real-time versions”链接）。</li>
 </ul>
-<h2>研究者注记</h2>
-<blockquote>①优势作为“条件”而非只作权重——策略学会按优势水平调整行为，这是 RECAP 名字里 Advantage-conditioned 的含义。②纠正数据的使用方式值得抄：不是混进演示里，而是按“偏离状态→恢复动作”的时机对齐监督（本站面试题库卷二 C18 亦讨论此点）。③自主经验要有标签才有用——价值函数就是那个标签的来源。</blockquote>
+<h2>4. 研究者注记</h2>
+<blockquote>①RECAP 的可复用模板：价值函数 = 自主经验的标注器；优势条件化 = 让策略“高于数据分布”的旋钮；纠正数据 = 恢复行为的监督来源。三件事各自独立，可单独移植到任何 VLA 后训练管线。②注意数据闭环：RECAP 产生的自主经验 + 价值标注，就是 π0.7 页面里“带策略元数据并入通用训练”的那批数据——π*0.6 是特化模型，也是 π0.7 的数据工厂。③复现级细节官方未完全公开（价值模型结构、优势离散化方式），开源社区的对标实现可关注 openpi 的 RL 分支进展。</blockquote>
 <p><b>参考</b>：Physical Intelligence, <i>π*0.6: a VLA That Learns from Experience and Corrections</i>（<a href="https://www.pi.website/blog/pistar06" target="_blank" rel="noopener">官方博客</a>）</p>
 
 <nav class="model-nav"><span><a href="./smolvla.html">← SmolVLA</a></span><span><a href="./pi07.html">π0.7 →</a></span></nav>
