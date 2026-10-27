@@ -77,29 +77,35 @@ p,li,figcaption{overflow-wrap:anywhere}
 <p class="kicker">2025 · HUGGING FACE · LEROBOT 生态</p>
 <h1>SmolVLA 精读</h1>
 <h2>1. 问题：VLA 的资源墙</h2>
-<p>OpenVLA（7B）、RT-2-X 等验证了开放 VLA 的可行性，但训练要 A100 集群、部署要大显存、依赖昂贵本体——学术实验室与爱好者被挡在门外。SmolVLA 的命题：<b>单张消费级 GPU 可训、CPU/消费 GPU 可部署</b>的 VLA，性能仍要有竞争力。答案分两半：架构上“小而精”，推理调度上“异步”。</p>
+<p>OpenVLA（7B）、RT-2-X 等验证了开放 VLA 的可行性，但训练要大集群、部署要大显存、依赖昂贵本体——学术实验室与爱好者被挡在门外。SmolVLA 的命题：<b>单张消费级 GPU 可训、CPU/消费 GPU 可部署</b>的 VLA，性能仍要有竞争力。答案分两半：架构上“小而精”，推理调度上“异步”。</p>
 <h2>2. 架构精读</h2>
 <h3>2.1 SmolVLM2 主干 + 交错注意力动作专家</h3>
-<p>VLM 主干用 <b>SmolVLM2</b>（SigLIP 视觉编码器 + SmolLM2 语言模型，针对多图输入优化）；动作专家以 <b>flow matching</b> 目标训练，输出 <b>n=50</b> 的动作块——π0 式动作头直接下沉。专家的注意力块是<b>交错排列</b>的：cross-attention（读 VLM 特征，金色块）与 self-attention（动作 token 之间，浅黄块）交替，让 50 个动作 token 在小参数量下仍充分吃到视觉语义。</p>
+<p>VLM 主干用 <b>SmolVLM2</b>（SigLIP 视觉编码器 + SmolLM2 语言模型，针对多图输入优化）；动作专家 $v_\theta$ 以 <b>flow matching</b> 目标训练，从 VLM 特征生成动作块 $\mathbf{A}_t = (a_t, ..., a_{t+n})$，<b>n=50</b>。专家的注意力块是<b>交错排列</b>的：cross-attention（读 VLM 特征，金色块）与 causal self-attention（动作 token 之间，浅黄块）交替，让 50 个动作 token 在小参数量下仍充分吃到视觉语义。训练超参：AdamW（$\beta_1=0.9, \beta_2=0.95$），图像统一缩放 <b>512×512</b>（与 VLM 输入口径一致）。</p>
 <figure><img src="./assets/smolvla_arch.png" loading="lazy" alt=""><figcaption><b>图 · SmolVLA 架构</b>（图片来源：Shukor et al., <i>SmolVLA</i>, arXiv:2506.01844，版权归原作者）</figcaption></figure>
-<h3>2.2 三个效率设计与一个反直觉消融</h3>
+<h3>2.2 效率设计与三张消融表</h3>
 <ul>
-<li><b>视觉 token 削减</b>：图像统一缩放到 512×512（与 VLM 输入口径一致），视觉 token 压到最少必要量。</li>
-<li><b>层跳过（layer skipping）</b>：推理时跳过 VLM 的部分上层。消融的关键结论：<b>“用 500M 的 VLM 但跳层”优于“直接换 256M 的更小 VLM”</b>——深度比宽度值钱，跳层是免费的宽度缩减。</li>
-<li><b>交错 cross/self-attention</b>：见上，cross 层比 self 层便宜。</li>
-<li>训练用 AdamW（$\beta_1=0.9, \beta_2=0.95$）。</li>
+<li><b>视觉 token 削减</b>：压到最少必要量（论文 Visual tokens reduction 节），省掉小模型吃不消的长视觉序列。</li>
+<li><b>层跳过（layer skipping）</b>：推理时跳过 VLM 的部分上层。消融关键结论：<b>“500M VLM 跳层”优于“直接换 256M VLM”</b>（Table 8：VLM-256M 平均 75.5，500M 跳层更高）——深度比宽度值钱，跳层是免费的宽度缩减。</li>
+<li><b>专家容量消融</b>（Table 9）：专家隐藏宽度 ×0.50 → 平均 80.3，×0.25 → 73.8：容量可以砍，但要留下限。</li>
+<li><b>训练目标消融</b>（Table 10）：flow matching 显著优于 L1 回归。</li>
+<li><b>状态放哪</b>（States to VLM or Expert?）：状态投影进 VLM 前缀（Prefix + cross-attention，平均 80.3）优于放到专家后缀（73.3）——语义层应该“看到”本体状态。</li>
 </ul>
 <h3>2.3 数据：社区规模化</h3>
-<p>预训练完全来自 LeRobot 社区数据集：<b>481 个数据集、22.9K episodes、10.6M 帧</b>——比其他 SOTA 的预训练集小至少一个数量级。配套工作是把社区数据里混乱的相机视角<b>标准化</b>（统一内外参约定），否则跨数据集训练无从谈起。这个“小一个数量级也能打”的结果，是社区数据路线的第一次系统性正名。</p>
-<figure><img src="./assets/smolvla_tasks.png" loading="lazy" alt=""><figcaption><b>图 · 训练/评测任务谱</b>（图片来源：arXiv:2506.01844，版权归原作者）</figcaption></figure>
-<h2>3. 异步推理栈（精读）</h2>
-<p>同步执行下，GPU 推理期间机器人干等——chunk 越长空闲越明显。SmolVLA 的异步栈把“感知与预测”从“执行”中解耦：机器人执行第 k 块时，最新观测已发往 <b>Policy Server</b>（可托管在远端 GPU）计算第 k+1 块。两个工程细节：①<b>早触发（early trigger）</b>：当动作队列长度降到阈值就发起推理，而不是等队列耗尽；②<b>陈旧块丢弃</b>：推理返回时若已过时则整块作废，不污染执行。官方口径：<b>响应快 30%、任务吞吐 2×</b>。</p>
+<p>预训练完全来自 LeRobot 社区数据集：<b>481 个数据集、22.9K episodes、10.6M 帧</b>——比其他 SOTA 的预训练集小至少一个数量级。配套工作是把社区数据里混乱的相机视角<b>标准化</b>（统一内外参约定）并做任务标注，否则跨数据集训练无从谈起。</p>
 
 <div class="anim">
 <svg viewBox="0 0 640 220" role="img" aria-label="异步推理解释动画">
+<defs>
+  <linearGradient id="gT" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e08a68"/><stop offset="1" stop-color="#c96442"/></linearGradient>
+  <linearGradient id="gG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8aa471"/><stop offset="1" stop-color="#71855c"/></linearGradient>
+  <linearGradient id="gA" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b98a4a"/><stop offset="1" stop-color="#a1732c"/></linearGradient>
+  <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse"><circle cx="1.6" cy="1.6" r="1.2" fill="#ded8ca"/></pattern>
+</defs>
+<rect x="1.5" y="1.5" width="637" height="217" rx="14" fill="#fdfcf9" stroke="#e5e1d8"/><rect x="1.5" y="1.5" width="637" height="217" rx="14" fill="url(#dots)" opacity="0.5"/>
   <text x="30" y="60" font-size="14.5" fill="#6e6b64">GPU 推理（下一块）</text>
   <rect x="30" y="72" width="580" height="26" rx="8" fill="#f0eee6"/>
-  <rect x="30" y="72" width="150" height="26" rx="8" fill="#c96442" opacity="0.85">
+  <rect x="30" y="72" width="150" height="26" rx="8" fill="url(#gT)" opacity="0.9">
     <animate attributeName="x" values="30;460;30" dur="5s" repeatCount="indefinite"/>
   </rect>
   <text x="30" y="140" font-size="14.5" fill="#6e6b64">机器人执行（动作块队列）</text>
@@ -117,11 +123,24 @@ p,li,figcaption{overflow-wrap:anywhere}
   <line x1="70" y1="60" x2="70" y2="190" stroke="#b15b4c" stroke-width="2" stroke-dasharray="5 5">
     <animate attributeName="x1" values="70;590;70" dur="5s" repeatCount="indefinite"/><animate attributeName="x2" values="70;590;70" dur="5s" repeatCount="indefinite"/>
   </line>
-  <text x="430" y="206" font-size="12.5" fill="#87847e">红虚线 = 当前时刻：执行第 k 块的同时，GPU 已在算第 k+1 块</text>
+  <text x="400" y="206" font-size="12.5" fill="#87847e">红虚线 = 当前时刻：执行第 k 块时，GPU 已在算第 k+1 块</text>
 </svg></div>
 <figure><img src="./assets/smolvla_async.png" loading="lazy" alt=""><figcaption><b>图 · 异步推理时序</b>（图片来源：arXiv:2506.01844，版权归原作者）</figcaption></figure>
-<h2>4. 结果与研究者注记</h2>
-<p>LIBERO 与 Meta-World 上以多任务设置训练，<b>胜过 Octo、OpenVLA 与 diffusion policy 基线</b>；真机在低成本 SO-100/SO-101 上验证，并展示跨本体共训的相互增益。</p>
+<h2>3. 异步推理栈（精读）</h2>
+<p>同步执行下 GPU 推理期间机器人干等。SmolVLA 的异步栈（论文 Algorithm 1）：输入 horizon T、chunk 大小 n、队列阈值 $g \in [0,1]$；初始观测先发 <b>Policy Server</b> 拿到第一块；之后每当队列长度低于阈值就送最新观测请求下一块——<b>执行第 k 块时第 k+1 块已在算</b>。官方口径：<b>响应快 30%、任务吞吐 2×</b>。</p>
+<figure><img src="./assets/lerobot_so100.webp" loading="lazy" alt=""><figcaption><b>动图 · LeRobot 生态 SO-100 低成本臂</b>（图片来源：<a href="https://github.com/huggingface/lerobot" target="_blank" rel="noopener">huggingface/lerobot</a> 仓库 media/readme/，Apache-2.0，版权归原作者）</figcaption></figure>
+<h2>4. 结果：小模型 vs 大模型的正面表</h2>
+<p>LIBERO（physical-intelligence/libero，1,693 episodes，每任务 10 trials）与 Meta-World（50 任务泛化）多任务训练对比——这是全文最硬的一张表：</p>
+<table>
+<tr><th>模型</th><th>异步</th><th colspan="4">分项成功率 (%)</th><th>平均</th></tr>
+<tr><td>Octo</td><td>否</td><td>77.6</td><td>21.5</td><td>11.4</td><td>15.8</td><td>31.6</td></tr>
+<tr><td>π0 (3.5B-PaliGemma)</td><td>否</td><td>80.4</td><td>40.9</td><td>36.7</td><td>44.0</td><td>50.5</td></tr>
+<tr><td>π0 (3.5B)</td><td>是</td><td>71.8</td><td>48.2</td><td>41.7</td><td>30.0</td><td>47.9</td></tr>
+<tr><td><b>SmolVLA (0.24B)</b></td><td>否</td><td><b>86.4</b></td><td>46.4</td><td>35.0</td><td><b>60.0</b></td><td><b>57.0</b></td></tr>
+<tr><td><b>SmolVLA (0.45B)</b></td><td>否</td><td>82.5</td><td>41.8</td><td>45.0</td><td><b>60.0</b></td><td><b>57.3</b></td></tr>
+</table>
+<p>论文原话的力度：<b>SmolVLA 持续胜过 VLM 初始化的 π0，与机器人数据预训练版 π0 相当</b>——同时训练快约 40%、显存省 6×。</p>
+<h2>5. 研究者注记</h2>
 <blockquote>①SmolVLA 与 π0 共享 flow matching 动作头，但把“规模叙事”换成“系统叙事”：层跳过、交错注意力、异步栈每一项都是系统工程，累积起来就是 2× 的实际吞吐——研究里容易被低估的这类贡献。②“跳层优于缩模型”的消融值得推广到所有 VLM+动作头的架构：主干深度在小数据动作学习里是冗余的。③社区数据（10.6M 帧）+ 标准化 = 可持续的预训练池，π0.7 的元数据“消毒”思路是它的自然延伸。</blockquote>
 <p><b>参考</b>：Shukor et al., <i>SmolVLA: A Vision-Language-Action Model for Affordable and Efficient Robotics</i>（<a href="https://arxiv.org/abs/2506.01844" target="_blank" rel="noopener">arXiv:2506.01844</a> · <a href="https://huggingface.co/blog/smolvla" target="_blank" rel="noopener">HF 博客</a> · <a href="https://github.com/huggingface/lerobot" target="_blank" rel="noopener">LeRobot</a>）</p>
 

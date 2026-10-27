@@ -77,29 +77,57 @@ p,li,figcaption{overflow-wrap:anywhere}
 <p class="kicker">2025 · PHYSICAL INTELLIGENCE · RL 后训练</p>
 <h1>π*0.6 与 RECAP 精读</h1>
 <h2>1. 问题：从“偶尔成功”到“持续可靠”的鸿沟</h2>
-<p>模仿学习的失败模式有清晰的机制：<b>误差复合</b>。VLA 犯一个小错（比如以错误角度抓住咖啡机手柄），环境随即进入训练分布外的状态，下一步更容易犯错——而<b>真正的失败原因可能发生在几步之前</b>，监督学习只在“当时正确”的轨迹上训练，永远不会修正这种早期偏差。LLM 输出错了可以重来，机器人错了物理世界不等人：所以 VLA“偶尔成功容易，持续可靠很难”。π*0.6（π0.6 基座 + RECAP 后训练）给出了一套可复制的解法。</p>
+<p>模仿学习的失败模式有清晰的机制：<b>误差复合</b>。VLA 在真机上犯一个小错（比如以错误角度抓住咖啡机手柄），环境随即进入训练分布外的状态，下一步更容易犯错——而<b>真正的失败原因可能发生在几步之前</b>，监督学习只在“当时正确”的轨迹上训练，永远不会修正这种早期偏差。所以 VLA“偶尔成功容易，持续可靠很难”。π*0.6（π0.6 基座 + RECAP 后训练）给出了一套可复制的解法。</p>
+
+<div class="anim">
+<svg viewBox="0 0 640 200" role="img" aria-label="信用分配动画">
+<defs>
+  <linearGradient id="gT" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e08a68"/><stop offset="1" stop-color="#c96442"/></linearGradient>
+  <linearGradient id="gG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8aa471"/><stop offset="1" stop-color="#71855c"/></linearGradient>
+  <linearGradient id="gA" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b98a4a"/><stop offset="1" stop-color="#a1732c"/></linearGradient>
+  <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse"><circle cx="1.6" cy="1.6" r="1.2" fill="#ded8ca"/></pattern>
+</defs>
+<rect x="1.5" y="1.5" width="637" height="197" rx="14" fill="#fdfcf9" stroke="#e5e1d8"/><rect x="1.5" y="1.5" width="637" height="197" rx="14" fill="url(#dots)" opacity="0.5"/>
+  <line x1="40" y1="90" x2="600" y2="90" stroke="#d9d3c5" stroke-width="3"/>
+  <circle cx="90" cy="90" r="7" fill="#b15b4c"/><text x="90" y="122" text-anchor="middle" font-size="12" fill="#b15b4c">t=2 抓取角度错</text>
+  <circle cx="220" cy="90" r="6" fill="#a1732c"/><circle cx="330" cy="90" r="6" fill="#a1732c"/>
+  <text x="275" y="60" text-anchor="middle" font-size="12" fill="#a1732c">小偏差累积</text>
+  <circle cx="460" cy="90" r="9" fill="#8f2f22" filter="url(#glow)"/><text x="460" y="122" text-anchor="middle" font-size="12" fill="#8f2f22">t=14 失败暴露</text>
+  <path d="M90,150 C220,175 380,165 455,105" stroke="#c96442" stroke-width="2.2" fill="none" stroke-dasharray="7 7">
+    <animate attributeName="stroke-dashoffset" from="56" to="0" dur="1.4s" repeatCount="indefinite"/></path>
+  <text x="270" y="185" text-anchor="middle" font-size="12.5" fill="#87847e">价值函数沿时间回溯归因：把失败“记到”早期错误头上 —— 监督学习做不到这一点</text>
+</svg></div>
 
 <div class="anim">
 <svg viewBox="0 0 640 250" role="img" aria-label="RECAP 循环动画">
+<defs>
+  <linearGradient id="gT" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e08a68"/><stop offset="1" stop-color="#c96442"/></linearGradient>
+  <linearGradient id="gG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8aa471"/><stop offset="1" stop-color="#71855c"/></linearGradient>
+  <linearGradient id="gA" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b98a4a"/><stop offset="1" stop-color="#a1732c"/></linearGradient>
+  <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse"><circle cx="1.6" cy="1.6" r="1.2" fill="#ded8ca"/></pattern>
+</defs>
+<rect x="1.5" y="1.5" width="637" height="247" rx="14" fill="#fdfcf9" stroke="#e5e1d8"/><rect x="1.5" y="1.5" width="637" height="247" rx="14" fill="url(#dots)" opacity="0.5"/>
   <defs>
     <path id="rc1" d="M250,70 C350,45 460,55 545,95" fill="none"/>
     <path id="rc2" d="M555,125 C520,190 420,215 330,200" fill="none"/>
     <path id="rc3" d="M300,185 C210,175 140,130 135,85" fill="none"/>
   </defs>
   
-    <circle cx="210" cy="90" r="44" fill="#ffffff" stroke="#71855c" stroke-width="2.4"/>
+    <circle cx="210" cy="90" r="44" fill="#ffffff" stroke="#71855c" stroke-width="2.6"/>
     <text x="210" y="88" text-anchor="middle" font-size="13.5" fill="#1f1e1d">演示</text>
     <text x="210" y="106" text-anchor="middle" font-size="11" fill="#6e6b64">Demo</text>
-    <circle cx="470" cy="95" r="44" fill="#ffffff" stroke="#a1732c" stroke-width="2.4"/>
+    <circle cx="470" cy="95" r="44" fill="#ffffff" stroke="#a1732c" stroke-width="2.6"/>
     <text x="470" y="93" text-anchor="middle" font-size="13.5" fill="#1f1e1d">纠正</text>
     <text x="470" y="111" text-anchor="middle" font-size="11" fill="#6e6b64">Coach</text>
-    <circle cx="300" cy="190" r="44" fill="#ffffff" stroke="#c96442" stroke-width="2.4"/>
+    <circle cx="300" cy="190" r="44" fill="#ffffff" stroke="#c96442" stroke-width="2.6"/>
     <text x="300" y="188" text-anchor="middle" font-size="13.5" fill="#1f1e1d">自主经验</text>
     <text x="300" y="206" text-anchor="middle" font-size="11" fill="#6e6b64">Explore</text>
-  <use href="#rc1" stroke="#71855c" stroke-width="2.2" fill="none" stroke-dasharray="8 7"><animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.5s" repeatCount="indefinite"/></use>
-  <use href="#rc2" stroke="#a1732c" stroke-width="2.2" fill="none" stroke-dasharray="8 7"><animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.5s" repeatCount="indefinite"/></use>
-  <use href="#rc3" stroke="#c96442" stroke-width="2.2" fill="none" stroke-dasharray="8 7"><animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.5s" repeatCount="indefinite"/></use>
-  <circle r="5" fill="#1f1e1d"><animateMotion dur="4.5s" repeatCount="indefinite" path="M250,70 C350,45 460,55 545,95 C520,190 420,215 330,200 C210,175 140,130 135,85 C160,55 210,58 250,70"/></circle>
+  <use href="#rc1" stroke="#71855c" stroke-width="2.4" fill="none" stroke-dasharray="8 7"><animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.5s" repeatCount="indefinite"/></use>
+  <use href="#rc2" stroke="#a1732c" stroke-width="2.4" fill="none" stroke-dasharray="8 7"><animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.5s" repeatCount="indefinite"/></use>
+  <use href="#rc3" stroke="#c96442" stroke-width="2.4" fill="none" stroke-dasharray="8 7"><animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.5s" repeatCount="indefinite"/></use>
+  <circle r="5.5" fill="#1f1e1d" filter="url(#glow)"><animateMotion dur="4.5s" repeatCount="indefinite" path="M250,70 C350,45 460,55 545,95 C520,190 420,215 330,200 C210,175 140,130 135,85 C160,55 210,58 250,70"/></circle>
   <text x="320" y="242" text-anchor="middle" font-size="12.5" fill="#87847e">价值函数估计回报，优势（advantage）作为条件反哺策略：好动作被强化，差动作被规避</text>
 </svg></div>
 <h2>2. RECAP 精读（RL with Experience & Corrections via Advantage-conditioned Policies）</h2>
@@ -112,7 +140,7 @@ p,li,figcaption{overflow-wrap:anywhere}
 <figure><video src="./assets/pistar06_coffee.mp4" controls playsinline preload="metadata"></video><figcaption><b>视频 · RECAP 训练后的咖啡制作</b>（视频来源：Physical Intelligence 官方博客 <i>π*0.6</i>，版权归原作者）</figcaption></figure>
 <h2>3. 结果</h2>
 <ul>
-<li>最难任务的吞吐量 <b>翻倍以上</b>，失败率<b>至少减半</b>；</li>
+<li>最难的几个任务吞吐量 <b>翻倍以上</b>，失败率<b>至少减半</b>；</li>
 <li>咖啡制作从 <b>5:30am 连续跑到 11:30pm</b>（全天商用时段）；</li>
 <li><b>新家叠 50 件未见衣物</b>数小时不中断；真实工厂里装配并贴标 <b>59 个巧克力包装盒</b>；</li>
 <li>三段未剪辑长视频全部公开（官方博客“Real-time versions”链接）。</li>
