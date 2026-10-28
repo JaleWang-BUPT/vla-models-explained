@@ -1,5 +1,6 @@
 // Original teaching examples and research protocols, not additional paper results.
 // Reuse the site's existing HTML elements and classes; never add presentation CSS here.
+import { advancedSections, advancedIntro, advancedGuide } from './research-advanced.mjs';
 const link = (url, label) => `<a href="${url}" target="_blank" rel="noopener">${label}</a>`;
 const openpiCode = 'https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/models/pi0.py';
 const smolCode = 'https://github.com/huggingface/lerobot/blob/9f45b7b37cc4b33f8ecdb503aa4d209370bd528d/src/lerobot/policies/smolvla/modeling_smolvla.py';
@@ -430,7 +431,7 @@ const studyGuide = String.raw`
 <tr><td>BC / RL后训练</td><td>分别强调示范拟合与奖励/价值驱动的改进</td><td>增加人工纠正数据本身也能改善BC</td></tr>
 <tr><td>零样本 / 泛化</td><td>相对明确留出的任务、场景或组合而言</td><td>有人指导、外部模型与后续训练不能省略不报</td></tr>
 </table>
-<div class="note">每个方法页现在分两层：前5节用于建立问题与证据，后5节展开接口、公式、教学算例、训练/执行与实验设计。目录可直接跳转。原论文/官方素材保持原样；教学说明不冒充已执行的实验。</div>
+<div class="note">每个方法页分三层：1–5节建立问题与证据，6–10节展开机制与接口，11–20节深入推导、代码契约、诊断和课题设计。目录可直接跳转。原论文/官方素材保持原样；教学说明不冒充已执行的实验。</div>
 `;
 
 function addToc(body) {
@@ -446,12 +447,15 @@ function addToc(body) {
 }
 
 export function withResearchNotes(page) {
-  if (page.file === 'index') return { ...page, body: page.body + studyGuide };
+  if (page.file === 'index') return { ...page, body: page.body + studyGuide + advancedGuide };
   const sections = deepDives[page.file];
   if (!sections) return page;
   const referenceMarker = '<p><b>参考</b>';
   if (!page.body.includes(referenceMarker)) throw new Error(`Missing reference marker: ${page.file}`);
-  const notes = teachingNote + sections.map(section => `<h2 id="${section.id}">${section.title}</h2>\n${section.body}`).join('\n');
+  const render = section => `<h2 id="${section.id}">${section.title}</h2>\n${section.body}`;
+  const more = advancedSections[page.file];
+  if (!more) throw new Error(`Missing advanced sections: ${page.file}`);
+  const notes = teachingNote + sections.map(render).join('\n') + advancedIntro + more.map(render).join('\n');
   const body = page.body.replace(referenceMarker, notes + '\n' + referenceMarker);
   return { ...page, body: addToc(body) };
 }

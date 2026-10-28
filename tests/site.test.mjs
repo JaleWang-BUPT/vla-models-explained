@@ -7,6 +7,8 @@ import { createHash } from 'node:crypto';
 import { pages } from '../content.mjs';
 import { media } from '../media.mjs';
 import { deepDives, teachingExamples } from '../research-notes.mjs';
+import { advancedSections } from '../research-advanced.mjs';
+import { scoreAmplification, ddimDeterministic, wilsonInterval, orthonormalDct, zeroFailureUpper, positiveFraction, cacheBudget } from '../notes/quantitative.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = path => readFileSync(join(root, path));
@@ -64,12 +66,12 @@ test('official animations keep controls and never force autoplay', () => {
   }
 });
 
-test('six chapters each have five substantial, clearly labelled deep-dive sections', () => {
+test('six chapters preserve their first five deep dives and now have twenty sections', () => {
   assert.equal(Object.keys(deepDives).length, 6);
   for (const p of chapters) {
     const sections = deepDives[p.file];
     assert.equal(sections.length, 5, p.file);
-    assert.equal((p.body.match(/<h2\b/g) || []).length, 10, p.file);
+    assert.equal((p.body.match(/<h2\b/g) || []).length, 20, p.file);
     assert.ok(sections.every(section => section.body.length > 300), p.file);
     assert.match(p.body, /教学算例/);
     assert.match(p.body, /研究建议/);
@@ -78,6 +80,95 @@ test('six chapters each have five substantial, clearly labelled deep-dive sectio
       assert.ok(p.body.includes(`<h2 id="${section.id}">${section.title}</h2>`));
     }
   }
+});
+
+test('sixty advanced sections are substantive, ordered, illustrated and research-labelled', () => {
+  assert.equal(Object.keys(advancedSections).length, 6);
+  assert.equal(Object.values(advancedSections).flat().length, 60);
+  for (const p of chapters) {
+    const sections = advancedSections[p.file];
+    assert.equal(sections.length, 10, p.file);
+    assert.equal(new Set(sections.map(section => section.id)).size, 10, p.file);
+    for (const [index, section] of sections.entries()) {
+      assert.ok(section.title.startsWith(`${index + 11}. `), section.title);
+      assert.ok((section.body.match(/[\u4e00-\u9fff]/g) || []).length >= 300, section.id);
+      assert.ok(p.body.includes(`<h2 id="${section.id}">${section.title}</h2>`), section.id);
+      assert.doesNotMatch(section.body, /<style\b|\bstyle=|<script\b|<svg\b/i, section.id);
+    }
+    assert.ok(sections.some(section => section.body.includes('<figure>')), p.file + ': original diagram missing');
+    const brief = sections[9].body;
+    for (const label of [/研究假设/, /对照|组别|基线|因素设计/, /指标/, /预算|成本|计算/, /交付|保存/]) assert.match(brief, label, p.file);
+    const withoutToc = p.body.replace(/<nav class="toc"[\s\S]*?<\/nav>/g, '');
+    assert.ok((withoutToc.match(/[\u4e00-\u9fff]/g) || []).length >= 6500, p.file);
+    assert.match(p.body, /没有在本站执行新的模型训练或真机实验/);
+  }
+});
+
+test('score amplification and deterministic DDIM obey their stated equations', () => {
+  const near = (x, y) => assert.ok(Math.abs(x - y) < 1e-10, `${x} != ${y}`);
+  near(scoreAmplification(0.64), 0.75);
+  assert.ok(scoreAmplification(0.01) > scoreAmplification(0.81));
+  for (const invalid of [0, 1, -1, NaN, '0.64']) assert.throws(() => scoreAmplification(invalid), RangeError);
+  const result = ddimDeterministic(0.4, 1.2, 0.64, 0.81);
+  near(result.clean, -0.4);
+  near(result.next, -0.36 + Math.sqrt(0.19) * 1.2);
+  near(ddimDeterministic(0.4, 1.2, 0.64, 0.64).next, 0.4);
+  near(ddimDeterministic(0.4, 1.2, 0.64, 1).next, -0.4);
+  assert.throws(() => ddimDeterministic(0.4, 1.2, 0.81, 0.64), RangeError);
+  assert.throws(() => ddimDeterministic(NaN, 1.2, 0.64, 0.81), RangeError);
+});
+
+test('orthonormal DCT preserves energy and the teaching quantization bound', () => {
+  const near = (x, y) => assert.ok(Math.abs(x - y) < 1e-10, `${x} != ${y}`);
+  const constant = orthonormalDct([0.2, 0.2, 0.2, 0.2]);
+  near(constant[0], 0.4);
+  for (const value of constant.slice(1)) near(value, 0);
+  const values = [0.13, 0.27, -0.11, 0.34];
+  const coefficients = orthonormalDct(values);
+  near(values.reduce((sum, x) => sum + x * x, 0), coefficients.reduce((sum, x) => sum + x * x, 0));
+  const delta = 0.05;
+  const quantized = coefficients.map(x => Math.round(x / delta) * delta);
+  const recovered = values.map((_, j) => quantized.reduce((sum, c, k) => sum + c * Math.sqrt((k === 0 ? 1 : 2) / values.length) * Math.cos(Math.PI * (j + 0.5) * k / values.length), 0));
+  const mse = recovered.reduce((sum, x, j) => sum + (x - values[j]) ** 2, 0) / values.length;
+  assert.ok(mse <= delta * delta / 4 + 1e-12);
+  near(orthonormalDct([0.7])[0], 0.7);
+  assert.throws(() => orthonormalDct([]), RangeError);
+});
+
+test('confidence examples handle small samples without claiming model results', () => {
+  const bounds = wilsonInterval(16, 20);
+  assert.ok(Math.abs(bounds.lower - 0.584) < 0.001);
+  assert.ok(Math.abs(bounds.upper - 0.919) < 0.001);
+  const mirror = wilsonInterval(4, 20);
+  assert.ok(Math.abs(bounds.lower + mirror.upper - 1) < 1e-10);
+  assert.equal(wilsonInterval(0, 20).lower, 0);
+  assert.equal(wilsonInterval(20, 20).upper, 1);
+  assert.ok(Math.abs(zeroFailureUpper(100) - 0.0295130496) < 1e-9);
+  assert.ok(zeroFailureUpper(1000) < zeroFailureUpper(100));
+  assert.throws(() => wilsonInterval(21, 20), RangeError);
+  assert.throws(() => wilsonInterval(16, 20, Infinity), RangeError);
+  assert.throws(() => zeroFailureUpper(0), RangeError);
+  assert.match(advancedSections['diffusion-policy'][7].body, /教学算例/);
+  assert.match(advancedSections.pistar06[7].body, /不是RECAP的实际实验次数或结果/);
+});
+
+test('thresholds, cache budgets and displayed arithmetic remain consistent', () => {
+  assert.equal(positiveFraction([-0.2, 0, 0.1, 0.5, 0.8], 0.1), 0.4);
+  assert.equal(positiveFraction([-0.2, 0, 0.1, 0.5, 0.8], 0), 0.6);
+  assert.equal(positiveFraction([0, 0], 0), 0);
+  assert.throws(() => positiveFraction([], 0), RangeError);
+  assert.deepEqual(cacheBudget(60, 5, 10, 10), {cached: 120, repeated: 660});
+  assert.deepEqual(cacheBudget(60, 5, 1, 10), {cached: 75, repeated: 75});
+  assert.throws(() => cacheBudget(60, 5, 0, 10), RangeError);
+  const exampleBodies = new Map(Object.values(advancedSections).flatMap(sections => sections.flatMap(section => [...section.body.matchAll(/data-advanced-example="([^"]+)">([\s\S]*?)<\/div>/g)].map(m => [m[1], m[2]]))));
+  for (const [key, value] of [['ddim', '0.1631'], ['wilson', '58.4'], ['dct', '0.40'], ['delta-anchor', '[11,13,16]'], ['cache-budget', '660'], ['attention-count', '31684'], ['threshold', '40'], ['zero-failure', '2.95'], ['system-latency', '2120']]) {
+    assert.ok(exampleBodies.get(key)?.includes(value), key + ': displayed value drifted');
+  }
+  assert.equal(50 * 128 + 50 ** 2, 8900);
+  assert.equal((128 + 50) ** 2, 31684);
+  assert.equal(50 * 51 / 2, 1275);
+  assert.ok(Math.abs(0.95 ** 10 - 0.5987369392) < 1e-9);
+  assert.ok(Math.abs(0.02 - (-0.02) - 0.04) < 1e-10);
 });
 
 test('chapter contents link to every section and every local fragment exists', () => {
