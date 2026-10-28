@@ -76,9 +76,10 @@ p,li,figcaption{overflow-wrap:anywhere}
 
 <p class="kicker">2025 · HUGGING FACE · LEROBOT 生态</p>
 <h1>SmolVLA 精读</h1>
-<h2>1. 问题：小模型能否支撑可复现的真机研究？</h2>
+<nav class="toc" aria-label="本页目录"><b>本页目录 · 概览与深入阅读</b><ol><li><a href="#section-1">问题：小模型能否支撑可复现的真机研究？</a></li><li><a href="#section-2">架构精读</a></li><li><a href="#section-3">异步推理栈：等待发生在哪里？</a></li><li><a href="#section-4">结果：修正基准与列名，保留实验条件</a></li><li><a href="#section-5">研究者注记</a></li><li><a href="#smol-attention">交错注意力：小模型的条件接口怎么工作</a></li><li><a href="#smol-training-runtime">从社区预训练到部署：分别管理三类预算</a></li><li><a href="#smol-queue-example">教学算例：240ms延迟后，50步动作还剩哪一段？</a></li><li><a href="#smol-async-loop">异步控制循环：并行之外还有哪些状态</a></li><li><a href="#smol-research-plan">研究建议：公平比较同步、异步与小型化</a></li></ol></nav>
+<h2 id="section-1">1. 问题：小模型能否支撑可复现的真机研究？</h2>
 <p>SmolVLA同时考虑参数、公开数据和执行系统：以SmolVLM2为感知/语义主干，用flow matching专家产生动作，并在LeRobot中提供训练与异步执行。常用配置约450M。消费级设备可用是可复现性目标，不代表任意GPU、batch或相机数都能达到同一训练成本与控制率。</p>
-<h2>2. 架构精读</h2>
+<h2 id="section-2">2. 架构精读</h2>
 <h3>2.1 VLM前缀与交错注意力动作专家</h3>
 <p>图像、语言与投影后的机器人状态进入VLM前缀，动作专家以其特征为条件。专家交替使用读前缀的cross-attention和动作token间的causal self-attention，而不是把π0的注意力结构原样缩小。用 $A_t=(a_t,\ldots,a_{t+n-1})$ 表示n个动作，避免把两端都包含的下标误数成n+1；论文常用chunk配置为50步。</p>
 <figure><img src="./assets/smolvla_arch.png" loading="lazy" decoding="async" alt="SmolVLA 的视觉语言前缀与交错注意力动作专家架构"><figcaption><b>官方架构图 · 保留的VLM层与交错注意力专家。</b> 图中状态也参与前缀编码；cross-attention不是机器人每个控制步都重新跑一遍VLM的含义。<br>来源：<a href="https://huggingface.co/blog/smolvla" target="_blank" rel="noopener">SmolVLA 官方博客 Figure 2</a> · © Hugging Face / SmolVLA authors</figcaption></figure>
@@ -86,11 +87,11 @@ p,li,figcaption{overflow-wrap:anywhere}
 <p>模型保留VLM较早的部分层，并减少视觉token等开销。这是训练/模型配置上的截断，不是部署时可随意跳过任意已训练层。消融结果支持作者所测配置，但不能推广成“深度普遍冗余”或“跳层等同宽度缩减”。动作专家容量、状态放置和训练目标都有独立消融，比较时还应固定参数与训练预算。</p>
 <h3>2.3 社区数据标准化的实际含义</h3>
 <p>论文预训练采用481份社区数据集、约22.9K episodes和10.6M帧。工作包括清理任务标注、规范相机视角类别和数据接口；<b>视角类别规范不等于统一了所有机器人相机的内外参</b>。模拟基准的从VLM初始化实验、社区机器人预训练与真机任务微调，是需要区分的训练设置。</p>
-<h2>3. 异步推理栈：等待发生在哪里？</h2>
+<h2 id="section-3">3. 异步推理栈：等待发生在哪里？</h2>
 <p>初始队列仍需等待第一块。之后按队列阈值请求新动作，在旧队列执行时并行推理；新块返回后，根据已经流逝的执行时间对齐、丢弃过期前缀并更新/聚合队列。不能把新块直接完整追加到末尾，否则动作可能对应旧观测。队列阈值太迟会耗尽，太早也可能增加无效推理；网络抖动和超时需要单独处理。</p>
 <figure><img src="./assets/smolvla_async.png" loading="lazy" decoding="async" alt="SmolVLA 的服务器推理与机器人队列执行时序图"><figcaption><b>论文时序图 · PolicyServer与RobotClient。</b> 依次看①初始请求，②执行若干动作后提交新观测，③返回时对齐并更新动作队列；不是“永不等待”的保证。<br>来源：<a href="https://arxiv.org/html/2506.01844v1" target="_blank" rel="noopener">SmolVLA 论文 Figure 2</a> · © Shukor et al.</figcaption></figure>
 <figure><video controls playsinline loop preload="metadata" poster="./assets/smolvla_official-poster.jpg" aria-label="SmolVLA 官方四联动图：异步、同步、扰动与新物体任务"><source src="./assets/smolvla_official.mp4" type="video/mp4">浏览器不支持此视频，请<a href="./assets/smolvla_official.mp4" target="_blank" rel="noopener">打开媒体文件</a>。</video><figcaption><b>官方四联动图 · 异步、同步、扰动与新物体。</b> 沿用官方对比内容，转为可暂停视频；各面板的任务/条件不完全相同，不能从这5秒循环独立估计泛化或加速比。<br>来源：<a href="https://huggingface.co/blog/smolvla" target="_blank" rel="noopener">SmolVLA 官方博客 Figure 1</a> · © Hugging Face / SmolVLA authors · <a href="https://cdn-uploads.huggingface.co/production/uploads/640e21ef3c82bd463ee5a76d/S-3vvVCulChREwHDkquoc.gif" target="_blank" rel="noopener">原始文件</a><br>官方 GIF 等时长转码为 H.264；仅为偶数尺寸补边，不改播放速度或帧顺序。<br>点击播放，可暂停、拖动进度或全屏；本站不自动播放，也不额外加速。</figcaption></figure>
-<h2>4. 结果：修正基准与列名，保留实验条件</h2>
+<h2 id="section-4">4. 结果：修正基准与列名，保留实验条件</h2>
 <p>下表仅摘录<b>论文v1 Table 2的LIBERO</b>设置，列为Spatial / Object / Goal / Long。此处“机器人预训练”不是“是否异步”；SmolVLA这一组从VLM初始化，因此表中No也不意味着论文没有社区预训练模型。不同论文、后续checkpoint与异步真机实验不能拼成一个排行榜。</p>
 <table>
 <tr><th>LIBERO · 论文Table 2</th><th>机器人预训练</th><th>Spatial</th><th>Object</th><th>Goal</th><th>Long</th><th>平均(%)</th></tr>
@@ -99,8 +100,60 @@ p,li,figcaption{overflow-wrap:anywhere}
 <tr><td>SmolVLA · 0.45B</td><td>否</td><td>90</td><td>96</td><td>92</td><td>71</td><td>87.3</td></tr>
 </table>
 <p>异步系统另见论文Figure 5：Pick-Place计时实验的平均完成用时为13.75s → 9.70s，减少约29.5%；固定时间实验平均完成方块数为1.8 → 3.8。三项真机任务的平均成功指标则为78.3 → 73.3。<b>更快不等于每项任务更准</b>，“约2×吞吐”也不是模型前向本身快了2×。</p>
-<h2>5. 研究者注记</h2>
+<h2 id="section-5">5. 研究者注记</h2>
 <blockquote>若研究运行时加速，至少同时记录模型耗时、观测年龄、队列长度、实际执行动作和任务结果。若研究小型化，分别消融VLM保留层、视觉token与专家宽度；若研究泛化，区分预训练与任务微调的数据。不要把“CPU能运行”与满足真机控制截止期划等号。</blockquote>
+<div class="note">深入阅读：下面把方法拆到变量、训练样本与执行接口。标为“教学算例”的数字由本站构造，标为“研究建议”的实验尚未由本站执行，不是论文新结果或作者默认配置。</div><h2 id="smol-attention">6. 交错注意力：小模型的条件接口怎么工作</h2>
+
+<p>把VLM产生的前缀特征记为 $C$，带噪动作隐藏向量记为 $X$。cross-attention可简写为 $\operatorname{softmax}(Q_XK_C^\top/\sqrt d)V_C$：query来自动作，key/value来自前缀。self-attention则把key/value也换成动作特征，并加上动作位置的causal mask。两者分别承担“读取条件”与“协调块内动作”的角色。</p>
+<p>causal attention不自动意味着逐动作自回归解码。这里每一步flow迭代仍可以并行更新整个动作张量，只是第 $j$ 个位置在该层不能读取比它靠后的动作位置。把mask的因果性和生成算法的串行性分开，是理解SmolVLA与离散token VLA的关键。</p>
+<p>前缀包含状态，因此“状态只进入动作专家”的π0表述不能直接搬到SmolVLA。视觉token减少、保留VLM的层数、专家宽度和采样次数，是四个不同的成本旋钮。它们都可能改变性能，不宜压成单一的“模型只有450M，所以很快”。</p>
+<p>公式方向也要与代码配套。这里核对的 <a href="https://github.com/huggingface/lerobot/blob/9f45b7b37cc4b33f8ecdb503aa4d209370bd528d/src/lerobot/policies/smolvla/modeling_smolvla.py" target="_blank" rel="noopener">LeRobot 9f45b7b · SmolVLA实现</a> 使用 <code>NOISE_AT_ONE</code> 约定：$x_s=s\epsilon+(1-s)A$，目标 $u=\epsilon-A$，从1向0积分。不同文档的时间变量名称相同，并不保证端点定义相同。</p>
+
+<h2 id="smol-training-runtime">7. 从社区预训练到部署：分别管理三类预算</h2>
+
+<h3>数据预算</h3>
+<p>预训练、目标任务微调和测试集分别记录episode数量、任务、相机与控制模式。社区数据格式统一后，仍应检查任务语言、动作频率、单位、机器人标定和质量。若测试集包含相同采集session的近重复场景，不能仅靠episode ID不同就断言完全独立。</p>
+<h3>计算预算</h3>
+<p>同一观测先经过视觉/语言/状态前缀，再用这些特征做多步动作生成。减少前缀token或模型层数主要影响编码；减少flow步数主要影响专家迭代。测速应在相同相机数、图像输入、精度、batch与设备上进行，并区分冷启动、编译后稳态与远程往返。</p>
+<h3>显存预算：参数字节数只是下限</h3>
+<p><b>教学估算：</b> 450M参数若每个权重占2字节，仅权重约0.90GB（十进制）；这不含激活、缓存、运行时工作区、梯度和优化器状态。能容纳权重不等于能以指定batch训练，更不等于满足真机控制时限。比较“消费级可用”时，应给出实际峰值内存和端到端性能，而非只报参数数。</p>
+
+<h2 id="smol-queue-example">8. 教学算例：240ms延迟后，50步动作还剩哪一段？</h2>
+
+<div class="note" data-example="queue">设执行频率50Hz、动作块50步、新请求的端到端延迟240ms；为便于计数，假定第0个动作计划时刻恰好等于观测时间。新块返回时，已经过去 $50\times0.24=12$ 个控制间隔。按这一理想时间网格，前12项已过期，剩38项；它们不能原封不动接在旧队列末尾。以上是本站的时间对齐算例，不是论文实测延迟。</div>
+<table>
+<tr><th>相对时间</th><th>客户端正在做什么</th><th>服务端 / 新块状态</th></tr>
+<tr><td>0ms</td><td>发送新观测；继续执行旧队列</td><td>新块的动作索引以这次请求为基准</td></tr>
+<tr><td>0–240ms</td><td>消耗旧动作，不因请求立即停住</td><td>预处理、推理与传输都计入延迟</td></tr>
+<tr><td>240ms返回</td><td>读取当前实际执行计数</td><td>对齐时间/索引，丢弃过期部分</td></tr>
+<tr><td>返回之后</td><td>按协议替换或聚合未来重叠区</td><td>不是把整块当作“此刻才开始”的50步</td></tr>
+</table>
+<p>若触发请求时旧队列剩16项，它可覆盖约320ms；相对240ms延迟只有约80ms、即4项余量。网络尾延迟一旦超过余量仍可能队列耗尽。一个粗略设计条件是 $q_{\rm trigger}\ge\lceil fL_{p99}\rceil+m$，$m$ 是额外余量；这只是排队预算，不是安全或稳定性证明。</p>
+<p>真实系统还存在相机采集时间、请求排队、执行器抖动和不同动作语义。应优先使用统一时钟下的时间戳和实际执行索引，不只按“平均延迟×频率”截断。位置与增量动作的重叠聚合也不能无条件共用同一规则。论文算法把聚合写成抽象函数，具体实现需检查所用版本。</p>
+
+<h2 id="smol-async-loop">9. 异步控制循环：并行之外还有哪些状态</h2>
+
+<ol>
+<li><b>启动：</b> 第一块尚未到达时没有旧动作可消费，初始化等待不可省略。</li>
+<li><b>消费：</b> 低层循环按既定时钟取出动作，记录实际执行序号与时间；RPC线程不直接改写已执行的动作。</li>
+<li><b>触发：</b> 队列低于阈值且服务端可接受新请求时，捕获新观测；明确是否只允许一个在途请求。</li>
+<li><b>接收：</b> 按请求ID和观测时间处理返回，拒绝不该覆盖更新结果的过期响应；只更新未来动作。</li>
+<li><b>异常：</b> 对超时、断链、队列耗尽使用事先验证的系统级回退/停止协议。异步策略本身不提供这些保证。</li>
+</ol>
+<p>当对象突然移动，下一次有效新观测及其返回结果才会改变策略条件；一直消费旧动作并不算“立即响应”。阈值更早可以提供延迟余量，也会改变观测年龄、请求频率和资源占用，必须结合具体流水线测试。异步栈首先是运行时设计，不是一次额外的模型训练。</p>
+
+<h2 id="smol-research-plan">10. 研究建议：公平比较同步、异步与小型化</h2>
+
+<table>
+<tr><th>比较</th><th>保持不变</th><th>同时报告</th></tr>
+<tr><td>同步 / 异步</td><td>checkpoint、生成步数、设备、初始场景</td><td>成功率、任务用时、观测年龄、空队列次数</td></tr>
+<tr><td>本地 / 远端</td><td>尽量对齐策略与执行接口</td><td>网络往返、服务端排队、p99时延与断链处理</td></tr>
+<tr><td>保留层数 / token数</td><td>训练预算、数据、控制协议</td><td>精度、峰值显存、前缀/专家分项耗时</td></tr>
+<tr><td>预训练 / 从VLM初始化</td><td>目标任务数据与微调评测协议</td><td>预训练数据来源，不能把这列改名“是否异步”</td></tr>
+</table>
+<p>看官方四联动图时，先暂停辨认每个面板的实验条件，再观察等待间隙与扰动响应。该片段适合找行为现象，不适合直接把像素运动速度换算成论文的成功率、任务吞吐或GPU加速比。</p>
+<blockquote>复现的最小日志应同时能回答：这条动作来自哪个观测、哪个请求、哪个chunk位置，真正执行于何时？如果只有推理开始/结束时间，就很难定位异步系统中的陈旧动作与队列错误。</blockquote>
+
 <p><b>参考</b>：<a href="https://arxiv.org/html/2506.01844v1" target="_blank" rel="noopener">SmolVLA论文v1（III、Table 2、Figure 5）</a> · <a href="https://huggingface.co/blog/smolvla" target="_blank" rel="noopener">官方博客</a> · <a href="https://github.com/huggingface/lerobot" target="_blank" rel="noopener">LeRobot实现</a>。</p>
 
 <nav class="model-nav"><span><a href="./pi05.html">← π0.5</a></span><span><a href="./pistar06.html">π*0.6 →</a></span></nav>

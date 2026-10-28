@@ -76,25 +76,70 @@ p,li,figcaption{overflow-wrap:anywhere}
 
 <p class="kicker">2025 · PHYSICAL INTELLIGENCE · RL 后训练</p>
 <h1>π0.6、π*0.6 与 RECAP 精读</h1>
-<h2>1. 先分清基座与星号版本</h2>
+<nav class="toc" aria-label="本页目录"><b>本页目录 · 概览与深入阅读</b><ol><li><a href="#section-1">先分清基座与星号版本</a></li><li><a href="#section-2">问题：如何从自己遇到的错误中得到训练信号？</a></li><li><a href="#section-3">RECAP精读</a></li><li><a href="#section-4">结果与边界</a></li><li><a href="#section-5">研究者注记</a></li><li><a href="#recap-ki">Knowledge Insulation：隔离梯度，不是冻结所有知识</a></li><li><a href="#recap-value">价值学习：从整段结果到当前处境的估计</a></li><li><a href="#recap-advantage-example">教学算例：为什么一次动作会得到正优势标签</a></li><li><a href="#recap-training-loop">一轮RECAP迭代怎样落到数据和模型版本</a></li><li><a href="#recap-research-plan">研究建议：把改进与额外反馈成本一起计量</a></li></ol></nav>
+<h2 id="section-1">1. 先分清基座与星号版本</h2>
 <p><b>π0.6是基座，π*0.6是引入RECAP的版本</b>。模型卡描述：以Gemma3-4B初始化视觉语言主干，动作专家约860M，保留高层子任务与低层动作生成，并加入更丰富的条件。采用Knowledge Insulation训练时，动作专家的梯度不回传到主VLM；这与原π0的训练接口有区别。不能只把它理解为“π0.5改个版本号”或把星号等同更大的参数量。</p>
 <p>复现入口先读模型卡，而不是从展示视频推断版本：它给出了动作专家、注意力与训练梯度路径。基座的预训练任务片段不等于RECAP后的全天运行记录。</p>
-<h2>2. 问题：如何从自己遇到的错误中得到训练信号？</h2>
+<h2 id="section-2">2. 问题：如何从自己遇到的错误中得到训练信号？</h2>
 <p>策略偏差会改变后续观测分布，错误可能累积。专家接管能补恢复行为；自主rollout还能提供成功、失败与速度差异。困难在于如何使用这些不等质量的数据，而不只是无条件复制全部动作。模仿学习并非“永远不会修错”，RECAP的重点是把奖励反馈、价值估计与条件化训练组织成可扩展配方。</p>
 <figure><video controls playsinline loop preload="metadata" poster="./assets/pistar06_portafilter-poster.jpg" aria-label="咖啡手柄早期抓取偏差在后续操作中暴露的官方失败案例"><source src="./assets/pistar06_portafilter.mp4" type="video/mp4">浏览器不支持此视频，请<a href="./assets/pistar06_portafilter.mp4" target="_blank" rel="noopener">打开媒体文件</a>。</video><figcaption><b>官方失败案例 · 咖啡手柄操作。</b> 早期接触/抓取偏差可能在后续步骤暴露；视频说明诊断问题，不证明价值函数能唯一识别物理因果。<br>来源：<a href="https://www.pi.website/blog/pistar06" target="_blank" rel="noopener">RECAP 官方博客</a> · © Physical Intelligence · <a href="https://website.pi-asset.com/pi06star/portafilter_drop.mp4" target="_blank" rel="noopener">原始文件</a><br>点击播放，可暂停、拖动进度或全屏；本站不自动播放，也不额外加速。</figcaption></figure>
-<h2>3. RECAP精读</h2>
-<h3>3.1 用回报训练分布式价值函数</h3>
-<p>根据轨迹结果构造回报，训练一个多任务分布式价值模型。论文把经验回报离散到201个bin，用交叉熵学习，再取期望恢复标量价值。它估计从当前处境到任务完成的前景与时间代价，<b>不是每个动作的真值正确标签，也不是反向扫描录像就能确定早期错误原因的因果模型</b>。</p>
+<h2 id="section-3">3. RECAP精读</h2>
+<h3>3.1 用回报训练价值分布模型</h3>
+<p>根据轨迹结果构造回报，训练一个多任务价值分布模型。论文把经验回报离散到201个bin，用交叉熵学习，再取期望恢复标量价值。它估计从当前处境到任务完成的前景与时间代价，<b>不是每个动作的真值正确标签，也不是反向扫描录像就能确定早期错误原因的因果模型</b>。</p>
 <h3>3.2 从优势估计到输入条件</h3>
 <p>用不折扣的n步形式示意：$\hat A_t=\sum_{j=0}^{N-1}r_{t+j}+V(o_{t+N})-V(o_t)$；终止时处理bootstrap。按任务阈值得到二值指示 $I_t=\mathbf1[\hat A_t>\epsilon_\ell]$，然后训练条件策略 $\pi_\theta(a_t\mid o_t,\ell,I_t)$，也保留无条件训练分支。推理时请求正优势条件；这是<b>优势条件化</b>，不是简单以优势给每条loss乘权重，也不等同PPO梯度更新。</p>
 <figure><img src="./assets/pistar06_architecture.png" loading="lazy" decoding="async" alt="RECAP 中价值函数、二值优势条件和 VLA 训练关系"><figcaption><b>论文Fig. 3 · 独立价值模型与优势条件化VLA。</b> 对照二值标签、离散/连续训练目标及stop-gradient阅读；正条件能否带来改进仍依赖估计与数据覆盖。<br>来源：<a href="https://arxiv.org/html/2511.14759v2" target="_blank" rel="noopener">RECAP 论文 Fig. 3</a> · © Physical Intelligence · <a href="https://arxiv.org/html/2511.14759v2/figures/model_architecture.png" target="_blank" rel="noopener">原始文件</a></figcaption></figure>
 <h3>3.3 离线预训练、任务微调与真机迭代</h3>
 <p>流程是离线RL预训练 → 演示任务微调 → 部署并收集自主经验/专家接管 → 更新价值与策略，可重复迭代。论文把人工纠正按正优势处理，这是关于纠正质量的设计假设，不是所有人工接管天然最优。数据来源、奖励定义、优势阈值与条件dropout都有公开论文描述，不能再写成“论文完全没公开实现细节”；公开说明也不等于完整代码、数据与权重均已发布。</p>
 <figure><video controls playsinline loop preload="metadata" poster="./assets/pistar06_intervention-poster.jpg" aria-label="专家遥操作接管机器人并纠正错误的官方示例"><source src="./assets/pistar06_intervention.mp4" type="video/mp4">浏览器不支持此视频，请<a href="./assets/pistar06_intervention.mp4" target="_blank" rel="noopener">打开媒体文件</a>。</video><figcaption><b>官方动态示例 · 专家实时接管与纠正。</b> 这属于遥操作纠正数据；与π0.7的语言教练不同，不应把两种人在环方式混为一谈。<br>来源：<a href="https://www.pi.website/blog/pistar06" target="_blank" rel="noopener">RECAP 官方博客</a> · © Physical Intelligence · <a href="https://website.pi-asset.com/pi06star/intervention_example.mp4" target="_blank" rel="noopener">原始文件</a><br>点击播放，可暂停、拖动进度或全屏；本站不自动播放，也不额外加速。</figcaption></figure>
-<h2>4. 结果与边界</h2>
+<h2 id="section-4">4. 结果与边界</h2>
 <p>论文在咖啡、衣物折叠与纸盒装配等任务比较成功率和吞吐；在部分困难任务上报告吞吐超过2×、失败率约减半，并展示长时间部署。论文描述一次约13小时的咖啡运行，短片并非该完整记录。应按具体任务、迭代轮次、人工反馈与统计协议阅读，不推广成“全天绝不失败”或已经证明部署安全。</p>
-<h2>5. 研究者注记</h2>
+<h2 id="section-5">5. 研究者注记</h2>
 <blockquote>做后训练研究时，先固定奖励/终止协议、价值校准与数据配比，再比较无条件模仿、只用人工纠正、优势条件化和其他RL提取方式。价值估计不准、正标签过稀或分布外动作都可能影响改进。应报告人工接管、场景复位与额外数据成本，而不仅是最终成功率。</blockquote>
+<div class="note">深入阅读：下面把方法拆到变量、训练样本与执行接口。标为“教学算例”的数字由本站构造，标为“研究建议”的实验尚未由本站执行，不是论文新结果或作者默认配置。</div><h2 id="recap-ki">6. Knowledge Insulation：隔离梯度，不是冻结所有知识</h2>
+
+<p>设VLM产生前缀特征 $h_\psi$，专家参数为 $\theta$。连续目标可概括为 $L_{\rm FM}(\theta;\operatorname{sg}(h_\psi))$，其中 $\operatorname{sg}$ 前向保留数值、反向阻断梯度。因此该路径的 $\nabla_\psi L_{\rm FM}=0$，但token预测的 $\nabla_\psi L_{\rm CE}$ 仍可以非零；主干不是必然永久冻结。</p>
+<p>这样做的动机是：新加入的连续专家与原有语义表示在训练早期不一定兼容，直接回传动作损失可能干扰VLM。离散token监督仍能训练主干，同时连续专家学习读取其表示。这里是<b>训练路径的隔离</b>，不等于推理时专家完全不读取VLM，也不等于切断两者之间的attention。</p>
+<p>这解释了图中两类目标的分工，却不能证明任何数据/架构上隔离都最优。若做消融，应固定训练目标、可训练参数、计算预算与专家初始化，再比较梯度是否穿越主干。细节见 <a href="https://www.pi.website/download/pi05_KI.pdf" target="_blank" rel="noopener">Knowledge Insulation原论文第5节</a>。</p>
+
+<h2 id="recap-value">7. 价值学习：从整段结果到当前处境的估计</h2>
+
+<p>对完整轨迹累计实际回报 $R_t=\sum_{j=t}^{T}r_j$，离散成目标bin，用交叉熵训练价值分布。若第 $b$ 个bin对应标量 $v_b$，期望值为 $V_\phi(O_t,\ell)=\sum_{b=1}^{B}p_\phi(b\mid O_t,\ell)v_b$，论文采用201个bin。这里的监督来自完整轨迹结果，是Monte Carlo价值估计，不是对每个动作都有人手工标“正确/错误”。</p>
+<p>该价值描述的是数据所代表的行为混合：初期以演示为主，加入自主rollout后参考分布发生变化。它不是一个脱离当前策略、对任意分布外动作都知道最优后果的 $Q^*$ oracle。用它估计优势时，要检查训练数据覆盖与校准，而不是只观察价值曲线是否平滑。</p>
+<p>回报还含时间代价和失败处理，所以“价值升高”不总能翻译成“成功概率同比例升高”。若修改奖励、终止定义或归一化，bin范围、优势尺度和阈值都要相应重新检查。对应原文见 <a href="https://arxiv.org/html/2511.14759v2" target="_blank" rel="noopener">RECAP IV-A与V-C节</a>。</p>
+
+<h2 id="recap-advantage-example">8. 教学算例：为什么一次动作会得到正优势标签</h2>
+
+<div class="note" data-example="advantage">自行设定每步代价 $r=-1$，当前估值 $V(O_t)=-10$，执行3步后估值 $V(O_{t+3})=-5$。则 $\hat A_t=-3+(-5)-(-10)=2$。若该教学任务阈值为1，就得到 $I_t=1$。直观上，付出3步后前景改善了5个单位，超出参考预期2个单位；这不是论文的真实奖励量纲或阈值。</div>
+<p>若当前价值过于悲观，优势可能虚高；若后继价值因视觉误判过于乐观，坏动作也可能获得正标签。因此终止mask、奖励累计区间、价值版本和状态时间对齐都影响标签质量。人工纠正强制给正标签还额外依赖“纠正确实有帮助”的假设。</p>
+<h3>为什么增加一个输入条件能改变策略？</h3>
+<p>对数据分布用Bayes规则，有 $p_D(a\mid O,I=1)\propto p_D(I=1\mid O,a)\,p_D(a\mid O)$。在估计合理、覆盖充分时，要求正条件会提高有利动作的相对概率；模型训练仍可读取正负两类数据，只是带不同条件。这与将负样本全部删除或只把loss乘一个权重，是不同的参数化。</p>
+<p>上述代数有助于理解policy extraction，却不是对有限数据神经网络的无条件改进证明。真实策略还可能把条件与场景偏差关联起来；阈值太高也可能使正条件支持过窄。论文因此同时训练有条件与无条件行为，并讨论阈值和引导强度的权衡。</p>
+
+<h2 id="recap-training-loop">9. 一轮RECAP迭代怎样落到数据和模型版本</h2>
+
+<ol>
+<li><b>收集并标注：</b> 保存演示、自主尝试和纠正片段，记录策略版本、成功/失败与终止原因，不能只存剪辑后的成功片段。</li>
+<li><b>训练价值：</b> 从当前累计数据计算回报监督，训练价值模型；在留出的轨迹上检查成功、失败及恢复阶段的估计。</li>
+<li><b>生成优势标签：</b> 固定价值checkpoint和n步区间，按任务阈值给动作/片段打标签；明确纠正片段边界。</li>
+<li><b>训练策略：</b> 以原始观测、任务和优势条件学习离散/连续目标，保留无条件分支；KI路径与优势条件不是同一个开关。</li>
+<li><b>重新部署评测：</b> 使用正条件请求动作，按同一初始分布和人工介入规则评估，再决定是否收集下一轮。</li>
+</ol>
+<p>价值模型服务于训练标签，不意味着每次在线动作都必须先由价值模型打分或做搜索；实际部署是否在线调用额外模型要另外说明。同样，使用更多纠正数据的BC对照很重要，否则可能把“多了一份恢复数据”的收益全部归给RL提取方式。</p>
+<p>若价值和策略反复更新，却没有保存生成标签时的checkpoint，后续就很难解释一次性能变化来自新数据、新价值还是新训练配比。每轮至少保存数据清单、奖励版本、标签统计、价值版本和策略版本。</p>
+
+<h2 id="recap-research-plan">10. 研究建议：把改进与额外反馈成本一起计量</h2>
+
+<table>
+<tr><th>对照</th><th>想回答的问题</th><th>需要匹配或记录</th></tr>
+<tr><td>原始BC / 加纠正的BC</td><td>恢复数据本身有多少贡献？</td><td>相同演示与纠正、任务预算和接管规则</td></tr>
+<tr><td>BC / 优势条件化</td><td>价值驱动的条件提取是否额外有效？</td><td>相同数据混合、训练预算、测试条件</td></tr>
+<tr><td>不同价值/阈值</td><td>错误标签和正样本比例如何影响策略？</td><td>价值校准、正标签率、动作分布与失败类型</td></tr>
+<tr><td>连续部署多轮</td><td>改进能否保留并迁移到新初始条件？</td><td>人工分钟数、复位次数、历史任务回归测试</td></tr>
+</table>
+<p>至少同时报告成功率、单位时间完成数、人工接管/复位成本和不确定性。长程任务中，失败更早发生会让“平均episode更短”，所以不能只用平均时长推断效率提升。需区分成功条件下用时、全流程吞吐和失败率。</p>
+<blockquote>最有信息的研究链是：哪类真实失败 → 哪类新增数据 → 价值如何改变 → 哪些动作获得新标签 → 闭环失败是否减少。它把视频、奖励、价值和策略连起来，但不把价值函数当作物理因果解释器。</blockquote>
+
 <p><b>参考</b>：<a href="https://arxiv.org/html/2511.14759v2" target="_blank" rel="noopener">RECAP论文v2（IV、V、附录F）</a> · <a href="https://website.pi-asset.com/pi06star/PI06_model_card.pdf" target="_blank" rel="noopener">π0.6模型卡</a> · <a href="https://www.pi.website/blog/pistar06" target="_blank" rel="noopener">官方博客与演示</a>。</p>
 
 <nav class="model-nav"><span><a href="./smolvla.html">← SmolVLA</a></span><span><a href="./pi07.html">π0.7 →</a></span></nav>

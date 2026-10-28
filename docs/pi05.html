@@ -76,9 +76,10 @@ p,li,figcaption{overflow-wrap:anywhere}
 
 <p class="kicker">2025 · PHYSICAL INTELLIGENCE</p>
 <h1>π0.5 精读</h1>
-<h2>1. 问题：换一个家庭，原来会的技能还能用吗？</h2>
+<nav class="toc" aria-label="本页目录"><b>本页目录 · 概览与深入阅读</b><ol><li><a href="#section-1">问题：换一个家庭，原来会的技能还能用吗？</a></li><li><a href="#section-2">方法精读：异构数据与混合动作表示</a></li><li><a href="#section-3">结果与消融</a></li><li><a href="#section-4">训练与实现：最先核对的接口</a></li><li><a href="#section-5">研究者注记</a></li><li><a href="#pi05-factorization">高层与低层：把长程任务分解成可学习条件</a></li><li><a href="#pi05-fast">FAST为什么帮助训练，却不强迫部署逐token解码？</a></li><li><a href="#pi05-masks">异构共训：三种mask，四类样本</a></li><li><a href="#pi05-end-to-end">从训练阶段到新家庭评测</a></li><li><a href="#pi05-research-plan">研究建议：先追踪知识从哪里迁移</a></li></ol></nav>
+<h2 id="section-1">1. 问题：换一个家庭，原来会的技能还能用吗？</h2>
 <p>π0.5重点研究训练中未见家庭里的长程操作：任务需要的不仅是抓取动作，还包括识别物体用途、理解场景和选择下一子任务。这里的“开放世界泛化”有具体实验定义，不能直接翻译成任意陌生环境、任意新技能都能零样本成功。数据多样性、训练目标与高层决策共同构成方法，而不只是“把π0训练得更久”。</p>
-<h2>2. 方法精读：异构数据与混合动作表示</h2>
+<h2 id="section-2">2. 方法精读：异构数据与混合动作表示</h2>
 <h3>2.1 不是每条样本都有完整动作标签</h3>
 <p>配方连接跨机器人动作数据、不同环境的机器人数据、高层语义任务以及网络视觉语言任务。不同样本可监督不同输出：描述、检测/指代、语义子任务或低层动作。<b>没有机器人动作标签的web样本，不等于补一个零动作当监督</b>；需要在共同序列接口里明确每种样本的目标与loss mask。</p>
 <figure class="duo"><img src="./assets/pi05_verbal.jpg" loading="lazy" decoding="async" alt="π0.5 训练中的语言指令样本"><img src="./assets/pi05_subtask.jpg" loading="lazy" decoding="async" alt="π0.5 训练中的语义子任务样本"><figcaption><b>官方训练样例 · 左：语言指令；右：语义子任务。</b> 它们说明条件与监督的形态，不证明每条训练样本同时具备所有模态。<br>来源：<a href="https://www.pi.website/blog/pi05" target="_blank" rel="noopener">π0.5 官方博客</a> · © Physical Intelligence</figcaption></figure>
@@ -89,16 +90,66 @@ p,li,figcaption{overflow-wrap:anywhere}
 <h3>2.3 高层先选择子任务，低层再执行动作</h3>
 <p>同一模型可先预测语义子任务 $\hat\ell_t$，再生成 $p(A_t\mid o_t,\ell,\hat\ell_t)$。例如总任务是清理厨房，当前子任务可能是拿起盘子。高层不是必须独立部署的另一个大模型，也不是先生成一串语言就自动获得长程规划保证；子任务更新频率、低层执行窗口和失败恢复仍需要设计。</p>
 <figure><video controls playsinline loop preload="metadata" poster="./assets/pi05_plate_1x-poster.jpg" aria-label="π0.5 官方擦干盘子并放到沥水架演示"><source src="./assets/pi05_plate_1x.mp4" type="video/mp4">浏览器不支持此视频，请<a href="./assets/pi05_plate_1x.mp4" target="_blank" rel="noopener">打开媒体文件</a>。</video><figcaption><b>官方视频 · 擦干盘子并放上沥水架，源文件标为1×。</b> 观察抓取、工具使用和阶段衔接；该片是行为示例，完整泛化结论仍来自论文的未见家庭评测。<br>来源：<a href="https://www.pi.website/blog/pi05" target="_blank" rel="noopener">π0.5 官方博客</a> · © Physical Intelligence · <a href="https://website.pi-asset.com/pi0_5/impressive-tasks/1x_dry_plate_on_dishrack_with_audio_lowres.mp4" target="_blank" rel="noopener">原始文件</a><br>点击播放，可暂停、拖动进度或全屏；本站不自动播放，也不额外加速。</figcaption></figure>
-<h2>3. 结果与消融</h2>
+<h2 id="section-3">3. 结果与消融</h2>
 <p>对照论文V节分别看新家庭任务进度、训练地点规模、各类共训数据消融与高层推理消融。地点更多与表现提高的曲线，不证明仅靠地点数量即可泛化；去掉web数据、跨本体数据或高层监督的效果也依任务而变。长程任务常用<b>部分进度评分</b>，其平均分不能直接写成整任务成功率。</p>
-<h2>4. 训练与实现：最先核对的接口</h2>
+<h2 id="section-4">4. 训练与实现：最先核对的接口</h2>
 <ul>
 <li><b>动作归一化</b>：固定采用均值方差还是分位数、统计对应哪份数据；padding维与有效mask必须一致。</li>
 <li><b>多模态监督</b>：记录FAST目标、高层子任务和连续专家分别在哪些样本/阶段启用，避免标签与attention泄漏。</li>
 <li><b>部署协议</b>：写清高层是否自动产生、是否有人提供子任务、如何重新观测和判定失败。</li>
 </ul>
-<h2>5. 研究者注记</h2>
+<h2 id="section-5">5. 研究者注记</h2>
 <blockquote>可研究的不是抽象的“更多数据”，而是迁移路径：哪类辅助任务改善哪种泛化？语义子任务带来的是语言理解、阶段切换还是更好的数据划分？用固定机器人数据和训练预算的消融拆开回答。相机视角、动作语义与监督模板都是接口条件，不应默认为跨数据集天然一致。</blockquote>
+<div class="note">深入阅读：下面把方法拆到变量、训练样本与执行接口。标为“教学算例”的数字由本站构造，标为“研究建议”的实验尚未由本站执行，不是论文新结果或作者默认配置。</div><h2 id="pi05-factorization">6. 高层与低层：把长程任务分解成可学习条件</h2>
+
+<p>用 $\ell$ 表示总指令，$\hat\ell_t$ 表示当前语义子任务，可以把联合分布写为 $p(A_t,\hat\ell_t\mid O_t,\ell)=p(\hat\ell_t\mid O_t,\ell)\,p(A_t\mid O_t,\ell,\hat\ell_t)$。这是条件概率的分解：高层决定当前要达成什么局部目标，低层决定对应的动作块；不表示高层已经穷举或验证所有未来步骤。</p>
+<p><b>教学例子：</b> “把桌上的餐具收好”可在当前观察下转成“拿起左侧盘子”，下一轮再转成“把盘子放进沥水架”。若第一次没有抓到盘子，下一步不能仅按预定脚本继续放置；需要用新观察更新子任务或恢复行为。具体何时触发更新，应由部署协议明确，而不是凭语言序列长度决定。</p>
+<p>这也解释了为什么高层子任务监督有价值：完整任务标签过于粗，难以区分同一厨房场景中当前到底在抓、擦还是放。局部标签让相近视觉状态与不同动作意图建立联系；同时，错误或不一致的子任务标注会把歧义直接带进条件。</p>
+
+<h2 id="pi05-fast">7. FAST为什么帮助训练，却不强迫部署逐token解码？</h2>
+
+<p>FAST不是把每个时刻、每个关节独立分桶后原样拉成很长的序列。它利用动作在时间上的相关性：对归一化后的每个动作维做时间方向的DCT，将系数量化，再用BPE压缩成token序列。训练模型预测的是这份离散编码；解码需要把token还原为系数，再逆变换到动作窗口。方法出处为 <a href="https://www.pi.website/research/fast" target="_blank" rel="noopener">FAST作者说明</a>。</p>
+<h3>教学例子：相关性来自时间，不是少一个关节</h3>
+<p>假设某个关节的四个目标都是 $[0.2,0.2,0.2,0.2]$。在常见正交DCT约定下，它只需要非零直流系数就能精确表达，其余频率为0；变化缓慢的轨迹通常也把较多能量集中到少数低频系数。实际压缩率还依赖量化精度、序列长度和BPE词表，不能把这个常量序列的极端例子当成所有接触动作都能无损高压缩。</p>
+<p>π0.5把这种离散监督用于高效预训练，再引入连续动作专家进行后训练/部署。共享的是条件表示与任务知识，不是规定每次真机动作都要先生成FAST token、再用flow“润色”。纯FAST解码与连续专家采样是应分别说明的推理路径，具体选用哪一路由checkpoint与服务接口确定。</p>
+<p>离散监督的交叉熵可以写成 $L_{\rm CE}=-\sum_j\log p_\theta(y_j\mid y_{&lt;j},O_t)$。teacher forcing在训练中使用已有的前缀目标token，部署时则没有尚未生成的真值token。若比较速度，区分并行训练吞吐和自回归推理时延，不能拿前者替代后者。</p>
+
+<h2 id="pi05-masks">8. 异构共训：三种mask，四类样本</h2>
+
+<p>一种教学写法是 $L_i=m_i^{\rm tok}L_i^{\rm CE}+\alpha m_i^{\rm act}L_i^{\rm FM}$。这里用两个二值符号概括该样本是否具有对应监督；真实实现还要细分token级/动作维级mask，并服从当前训练阶段。“没有目标”应当不计算那部分loss，不能随手补0并当作正确标签。</p>
+<table>
+<tr><th>样本类型</th><th>可提供的token目标</th><th>是否有连续动作目标</th><th>主要连接</th></tr>
+<tr><td>机器人操作片段</td><td>子任务和/或FAST动作</td><td>若数据及阶段支持则有</td><td>语义与运动</td></tr>
+<tr><td>高层语义样本</td><td>下一子任务</td><td>不必有</td><td>视觉状态与阶段决策</td></tr>
+<tr><td>检测 / 指代样本</td><td>对象、位置等离散目标</td><td>通常无</td><td>语言与视觉定位</td></tr>
+<tr><td>网络视觉语言样本</td><td>描述或问答等</td><td>无</td><td>通用语义知识</td></tr>
+</table>
+<p>表格是监督关系示意，不是作者数据加载器的完整枚举。<b>Padding mask</b>阻止读取填充位置；<b>attention mask</b>规定token之间能否互看；<b>loss mask</b>规定哪些输出计入监督。即使把真值FAST位置的loss关掉，如果带噪动作分支仍能读到这些未来真值，泄漏依然存在。</p>
+<p>因此检查训练样本时，既打印输入/目标，又可视化一小批attention矩阵；再用一个没有动作标签的web样本，确认动作loss确实不产生伪监督。原配方与表示隔离见 <a href="https://arxiv.org/html/2504.16054v1" target="_blank" rel="noopener">π0.5 IV节</a>；后来的KI是另一篇方法，不应回写成原论文所有配置都已使用同一梯度隔离方案。</p>
+
+<h2 id="pi05-end-to-end">9. 从训练阶段到新家庭评测</h2>
+
+<ol>
+<li><b>预训练：</b> 用机器人和非机器人数据学习token预测，包括语言、空间任务与FAST动作监督；记录数据配比和每类目标是否有效。</li>
+<li><b>后训练：</b> 加入连续动作专家，按该阶段目标训练；区分训练主干、专家与辅助token目标的具体设置。</li>
+<li><b>高层推理：</b> 读取当前场景和总指令，产生当前语义子任务；评测时注明这是模型输出还是人为给定。</li>
+<li><b>低层执行：</b> 以观测、总指令和子任务生成动作块，按执行窗口反馈更新。高层/低层更新可以不同频，不能把一次高层预测视为整段开环动作。</li>
+</ol>
+<h3>教学算例：任务进度不是整任务成功率</h3>
+<div class="note" data-example="progress">假设研究者自行定义4个等权里程碑：拿盘子、擦干、放入架子、归位工具。一次执行完成前3项，进度是 $3/4=75\%$，但“4项全部完成”的二值成功指标仍为0。这不是π0.5论文的实际评分表，只说明两个统计量为什么不能互换。</div>
+<p>未见家庭测试至少要列出：哪些家庭完全未参与训练、物体/家具与训练的重叠、是否给高层子任务、是否用过该场景采集额外微调数据，以及失败后是否允许复位重试。少一项，就可能把“场景迁移”与“交互式适配”混在一起。</p>
+
+<h2 id="pi05-research-plan">10. 研究建议：先追踪知识从哪里迁移</h2>
+
+<table>
+<tr><th>假设</th><th>对照设计</th><th>容易混入的因素</th></tr>
+<tr><td>web数据改善新物体语义</td><td>固定机器人数据和总预算，替换/去除特定web目标</td><td>训练步数、视觉增强或数据总量同时改变</td></tr>
+<tr><td>高层监督改善阶段切换</td><td>自动子任务 / 人工正确子任务 / 无子任务分别评测</td><td>人为条件把原本的高层错误隐藏了</td></tr>
+<tr><td>离散预训练改善效率</td><td>以总训练计算和墙钟时间对齐，而非只按step</td><td>序列长度、批量、专家是否参与前向不同</td></tr>
+<tr><td>跨本体数据改善新家庭</td><td>固定目标本体数据，控制辅助数据来源与比例</td><td>新数据可能同时引入更多场景和物体</td></tr>
+</table>
+<blockquote>最有价值的结果不是“共训有效”，而是找到可解释的迁移通道：哪一种辅助监督，改善哪一种错误，在什么数据与预算条件下仍成立。看盘子演示时，把对象识别、当前子任务选择和连续接触动作分别记下来，后续实验才能逐项归因。</blockquote>
+
 <p><b>参考</b>：<a href="https://arxiv.org/html/2504.16054v1" target="_blank" rel="noopener">π0.5论文v1（IV、V、附录）</a> · <a href="https://www.pi.website/blog/pi05" target="_blank" rel="noopener">官方博客与公开视频</a> · <a href="https://github.com/Physical-Intelligence/openpi" target="_blank" rel="noopener">公开实现</a>。</p>
 
 <nav class="model-nav"><span><a href="./pi0.html">← π0</a></span><span><a href="./smolvla.html">SmolVLA →</a></span></nav>

@@ -106,6 +106,27 @@ p,li,figcaption{overflow-wrap:anywhere}
 </ol>
 <p>阅读建议：先看论文方法图，再播放旁边的官方演示，最后对照“研究者注记”列出准备改变的变量。素材与版本口径见 <a href="./credits.html">Credits</a>。</p>
 
+<h2 id="study-guide">研究阅读路线：先复现一个闭环，再比较方法</h2>
+<table>
+<tr><th>阶段</th><th>优先阅读</th><th>应当留下的产出</th></tr>
+<tr><td>连续动作基础</td><td><a href="./diffusion-policy.html#dp-denoising">DP去噪算例</a> → <a href="./pi0.html#pi0-time-conventions">π0时间约定</a></td><td>能手算一次加噪/更新，写清采样时间与物理时间</td></tr>
+<tr><td>VLA训练接口</td><td><a href="./pi0.html#pi0-token-interface">token与mask</a> → <a href="./pi05.html#pi05-masks">异构监督</a></td><td>一张样本字段、attention和loss有效位置对照表</td></tr>
+<tr><td>真机运行时</td><td><a href="./smolvla.html#smol-queue-example">异步队列算例</a> → <a href="./pi0.html#pi0-action-contract">动作契约</a></td><td>包含观测、请求、动作和执行时间戳的日志</td></tr>
+<tr><td>经验后训练</td><td><a href="./pistar06.html#recap-value">价值监督</a> → <a href="./pistar06.html#recap-advantage-example">优势标签</a></td><td>数据/价值/策略版本与额外人工反馈成本</td></tr>
+<tr><td>记忆与组合泛化</td><td><a href="./pi07.html#pi07-memory">记忆接口</a> → <a href="./pi07.html#pi07-protocols">评测边界</a></td><td>分开记录语言指导、视觉目标与本体×任务留出</td></tr>
+</table>
+<h2 id="shared-notation">跨模型共同语言：不要被相同符号误导</h2>
+<table>
+<tr><th>术语</th><th>本笔记中的含义</th><th>最常见的混淆</th></tr>
+<tr><td>动作块 / horizon</td><td>未来若干控制点组成的连续张量</td><td>预测多少步不等于实际开环执行多少步</td></tr>
+<tr><td>生成时间</td><td>噪声到动作的采样坐标</td><td>不是机器人已经执行到的物理时刻</td></tr>
+<tr><td>token</td><td>序列位置，可承载离散或连续表示</td><td>有动作token不等于动作一定量化为词表项</td></tr>
+<tr><td>causal mask</td><td>限制序列位置之间的信息读取</td><td>不自动意味着逐动作串行自回归采样</td></tr>
+<tr><td>BC / RL后训练</td><td>分别强调示范拟合与奖励/价值驱动的改进</td><td>增加人工纠正数据本身也能改善BC</td></tr>
+<tr><td>零样本 / 泛化</td><td>相对明确留出的任务、场景或组合而言</td><td>有人指导、外部模型与后续训练不能省略不报</td></tr>
+</table>
+<div class="note">每个方法页现在分两层：前5节用于建立问题与证据，后5节展开接口、公式、教学算例、训练/执行与实验设计。目录可直接跳转。原论文/官方素材保持原样；教学说明不冒充已执行的实验。</div>
+
 <nav class="model-nav"><span></span><span></span></nav>
 </main>
 <footer><div>本站是研究笔记，非官方资料；方法描述以各论文/官方博客为准，图片与视频版权归原作者（见各图注与 <a href="./credits.html">Credits</a>）。本站文字与代码以 MIT 协议提供；引用媒体不在此授权范围内 · <a href="https://github.com/JaleWang-BUPT/vla-models-explained" target="_blank" rel="noopener">GitHub 仓库</a></div></footer>

@@ -1,6 +1,7 @@
 // Research notes with paper figures and official demonstrations.
 // Presentation tokens, typography and layout remain in the original build.mjs.
 import { media } from './media.mjs';
+import { withResearchNotes } from './research-notes.mjs';
 
 const esc = s => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const LINK = (url, label) => '<a href="' + esc(url) + '" target="_blank" rel="noopener">' + label + '</a>';
@@ -218,8 +219,8 @@ ${VID("smolvla_official.mp4", "<b>官方四联动图 · 异步、同步、扰动
 <p>策略偏差会改变后续观测分布，错误可能累积。专家接管能补恢复行为；自主rollout还能提供成功、失败与速度差异。困难在于如何使用这些不等质量的数据，而不只是无条件复制全部动作。模仿学习并非“永远不会修错”，RECAP的重点是把奖励反馈、价值估计与条件化训练组织成可扩展配方。</p>
 ${VID("pistar06_portafilter.mp4", "<b>官方失败案例 · 咖啡手柄操作。</b> 早期接触/抓取偏差可能在后续步骤暴露；视频说明诊断问题，不证明价值函数能唯一识别物理因果。")}
 <h2>3. RECAP精读</h2>
-<h3>3.1 用回报训练分布式价值函数</h3>
-<p>根据轨迹结果构造回报，训练一个多任务分布式价值模型。论文把经验回报离散到201个bin，用交叉熵学习，再取期望恢复标量价值。它估计从当前处境到任务完成的前景与时间代价，<b>不是每个动作的真值正确标签，也不是反向扫描录像就能确定早期错误原因的因果模型</b>。</p>
+<h3>3.1 用回报训练价值分布模型</h3>
+<p>根据轨迹结果构造回报，训练一个多任务价值分布模型。论文把经验回报离散到201个bin，用交叉熵学习，再取期望恢复标量价值。它估计从当前处境到任务完成的前景与时间代价，<b>不是每个动作的真值正确标签，也不是反向扫描录像就能确定早期错误原因的因果模型</b>。</p>
 <h3>3.2 从优势估计到输入条件</h3>
 <p>用不折扣的n步形式示意：$\hat A_t=\sum_{j=0}^{N-1}r_{t+j}+V(o_{t+N})-V(o_t)$；终止时处理bootstrap。按任务阈值得到二值指示 $I_t=\mathbf1[\hat A_t>\epsilon_\ell]$，然后训练条件策略 $\pi_\theta(a_t\mid o_t,\ell,I_t)$，也保留无条件训练分支。推理时请求正优势条件；这是<b>优势条件化</b>，不是简单以优势给每条loss乘权重，也不等同PPO梯度更新。</p>
 ${FIG("pistar06_architecture.png", "<b>论文Fig. 3 · 独立价值模型与优势条件化VLA。</b> 对照二值标签、离散/连续训练目标及stop-gradient阅读；正条件能否带来改进仍依赖估计与数据覆盖。")}
@@ -292,4 +293,4 @@ ${creditRows}
 <p>代码与本站原创文字使用MIT许可；引用媒体的版权归各自权利人，仓库代码许可证不自动覆盖这些媒体。若需移除某项引用，请在GitHub提交issue。</p>
 `
 }
-];
+].map(withResearchNotes);

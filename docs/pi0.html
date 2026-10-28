@@ -76,9 +76,10 @@ p,li,figcaption{overflow-wrap:anywhere}
 
 <p class="kicker">2024 · PHYSICAL INTELLIGENCE</p>
 <h1>π0 精读</h1>
-<h2>1. 问题：把语义先验接到连续动作</h2>
+<nav class="toc" aria-label="本页目录"><b>本页目录 · 概览与深入阅读</b><ol><li><a href="#section-1">问题：把语义先验接到连续动作</a></li><li><a href="#section-2">架构精读</a></li><li><a href="#section-3">训练与数据</a></li><li><a href="#section-4">结果与消融</a></li><li><a href="#section-5">研究者注记</a></li><li><a href="#pi0-token-interface">Token接口与注意力：谁能看见谁？</a></li><li><a href="#pi0-time-conventions">Flow matching推导：把论文与代码的时间方向对齐</a></li><li><a href="#pi0-training-loop">从训练样本到一块动作的完整流程</a></li><li><a href="#pi0-action-contract">真机接口：形状对了，语义也可能错</a></li><li><a href="#pi0-research-plan">研究设计：把语义能力、生成能力和执行能力拆开</a></li></ol></nav>
+<h2 id="section-1">1. 问题：把语义先验接到连续动作</h2>
 <p>π0研究的是：如何保留视觉语言预训练的知识，同时高效生成精细的连续动作块。原始OpenVLA等离散自回归方案有分桶和串行解码成本；这不代表自回归模型不能表达多模态，也不代表所有离散动作方法都不能输出chunk。π0选择<b>VLM权重 + 独立动作专家 + flow matching</b>，把视觉语义和连续动作分布放进一个有结构的注意力系统。</p>
-<h2>2. 架构精读</h2>
+<h2 id="section-2">2. 架构精读</h2>
 <h3>2.1 两组权重，通过有掩码的注意力交互</h3>
 <p>原始模型以约3B的PaliGemma为主干，配约300M动作专家。<b>图像/语言token走VLM权重，状态和带噪动作token走专家权重</b>；不同组通过attention接口交互，哪些token可见由mask决定，并非所有位置无条件双向可见。这种设计受Transfusion启发，但不是稀疏路由MoE的同义词，也不是简单在VLM最后接一个MLP。</p>
 <figure><img src="./assets/pi0_overview.png" loading="lazy" decoding="async" alt="π0 的视觉语言主干、动作专家与跨本体训练来源"><figcaption><b>论文方法图 · π0的跨本体数据、视觉语言主干与动作专家。</b> 注意右侧动作专家的状态输入与噪声输入，以及视觉语言先验和机器人训练数据的来源区别。<br>来源：<a href="https://arxiv.org/abs/2410.24164" target="_blank" rel="noopener">π0 论文 Fig. 3</a> · © Physical Intelligence</figcaption></figure>
@@ -88,13 +89,75 @@ p,li,figcaption{overflow-wrap:anywhere}
 <h3>2.3 动作块与50Hz的正确含义</h3>
 <p>原论文使用 $H=50$ 的动作块。若动作点以50Hz执行，它覆盖约1秒；这不意味着每次都开环执行满1秒，更不意味着模型推理为50Hz。重规划调用率、实际执行前缀和低层伺服频率应分别报告。RTC、重叠平均与异步调度是额外的执行设计，不能仅靠插值推导出闭环稳定。</p>
 <figure><video controls playsinline loop preload="metadata" poster="./assets/pi0_box_1x-poster.jpg" aria-label="π0 官方纸盒装配演示，发布文件标为一倍速"><source src="./assets/pi0_box_1x.mp4" type="video/mp4">浏览器不支持此视频，请<a href="./assets/pi0_box_1x.mp4" target="_blank" rel="noopener">打开媒体文件</a>。</video><figcaption><b>官方视频 · 纸盒装配，源文件标为1×。</b> 观察连续动作和接触过程；这段演示不显示ODE内部采样，因此不能用它证明“积分沿直线”或测量模型调用频率。<br>来源：<a href="https://www.pi.website/blog/pi0" target="_blank" rel="noopener">π0 官方博客</a> · © Physical Intelligence · <a href="https://website.pi-asset.com/v2/upload/lowres_processed1xspeed_build_box_3.mp4" target="_blank" rel="noopener">原始文件</a><br>点击播放，可暂停、拖动进度或全屏；本站不自动播放，也不额外加速。</figcaption></figure>
-<h2>3. 训练与数据</h2>
+<h2 id="section-3">3. 训练与数据</h2>
 <p>本页采用论文v3口径：自采数据覆盖7种机器人构型、68项任务，并混合OXE数据；论文描述约10,000小时演示规模。官方博客采用的平台统计口径与论文并不完全相同，数字比较应先固定版本。<b>互联网视觉语言知识主要来自VLM初始化</b>，不要把π0的机器人训练阶段与π0.5显式混入web任务的共训配方混为一谈。</p>
 <figure><img src="./assets/pi0_teaser.png" loading="lazy" decoding="async" alt="π0 的机器人平台与灵巧操作任务示例"><figcaption><b>论文图 · 平台和任务示例。</b> 跨本体共享需要动作语义、单位、归一化和缺失维处理，不是单纯把向量补到同样长度。<br>来源：<a href="https://arxiv.org/abs/2410.24164" target="_blank" rel="noopener">π0 论文</a> · © Physical Intelligence</figcaption></figure>
-<h2>4. 结果与消融</h2>
+<h2 id="section-4">4. 结果与消融</h2>
 <p>阅读原论文VI节时分开看：预训练基座的直接任务表现、语言跟随、新技能微调，以及复杂多阶段任务。无VLM初始化的π0-small消融用于研究预训练先验的作用，但网络结构也有差别，不能解释成“参数越大必然更好”。同样，基座结果、任务后训练结果和后来的openpi基准checkpoint不可混用。</p>
-<h2>5. 研究者注记</h2>
+<h2 id="section-5">5. 研究者注记</h2>
 <blockquote>值得复用的是模块接口，而不是一个万能叙事：分别消融VLM先验、动作专家容量、生成步数与执行视界。Flow与diffusion可通过特定路径/参数化联系，不能按“直线/弯曲、确定/随机”普遍二分。实验记录里同时写动作Hz、调用延迟、重规划率与真实执行时间戳，才能定位加速到底改善了哪一层。</blockquote>
+<div class="note">深入阅读：下面把方法拆到变量、训练样本与执行接口。标为“教学算例”的数字由本站构造，标为“研究建议”的实验尚未由本站执行，不是论文新结果或作者默认配置。</div><h2 id="pi0-token-interface">6. Token接口与注意力：谁能看见谁？</h2>
+
+<p>这里的token首先是序列位置，不必是词表里的整数。一个连续动作向量先经投影，就能占据一个动作token位置；最后再把该位置的隐藏向量投影回动作维。用50个动作token表示50个控制点，与把每个关节离散成词表项，是不同的动作表示。</p>
+<p>按原论文附录A-B，可把序列分成视觉/语言块 $P$、状态块 $S$、带噪动作块 $X$。下表行是query、列是key/value；“可见”包含块内双向关系。这是解释缓存与条件结构的最小接口图，不是新增网络。</p>
+<table>
+<tr><th>Query → Key/Value</th><th>$P$ 图像/语言</th><th>$S$ 状态</th><th>$X$ 带噪动作</th></tr>
+<tr><td>$P$</td><td>可见</td><td>不可见</td><td>不可见</td></tr>
+<tr><td>$S$</td><td>可见</td><td>可见</td><td>不可见</td></tr>
+<tr><td>$X$</td><td>可见</td><td>可见</td><td>可见</td></tr>
+</table>
+<p>每次积分改变 $X$，但不改变同一调用中的 $P,S$。由于前两块不读取 $X$，其表示不被当前带噪动作污染，相应K/V可复用。动作块内部双向注意力允许未来动作位置共同参与生成；它看的是同一生成状态中的其他带噪位置，不是把测试时的真值未来动作偷偷提供给模型。</p>
+<p>训练时梯度是否穿过主干是另一个问题。<b>注意力的可见性mask、padding mask、loss mask和stop-gradient各自控制不同对象</b>。π0的块因果接口不能直接等同后来的Knowledge Insulation。原始接口见 <a href="https://arxiv.org/html/2410.24164v3" target="_blank" rel="noopener">π0附录A-B</a>。</p>
+
+<h2 id="pi0-time-conventions">7. Flow matching推导：把论文与代码的时间方向对齐</h2>
+
+<p>给定一组噪声—数据配对，路径对生成时间求导就得到监督速度。平方损失的最优回归函数是当前带噪状态和条件下的目标速度期望：$v^*(x,\tau,o)=\mathbb E[A-\epsilon\mid x,\tau,o]$。同一个位置可能来自不同训练配对，所以学习到的是条件向量场，不能把某一对样本的直线硬套到全部推理路径。</p>
+<table>
+<tr><th>约定</th><th>带噪状态与目标速度</th><th>采样方向</th></tr>
+<tr><td>π0论文：噪声在0</td><td>$x_\tau=(1-\tau)\epsilon+\tau A$；$u=A-\epsilon$</td><td>$\tau:0\to1$，正步长</td></tr>
+<tr><td>openpi：噪声在1</td><td>$x_s=s\epsilon+(1-s)A$；$u=\epsilon-A$</td><td>$s:1\to0$，负步长</td></tr>
+</table>
+<p>取 $s=1-\tau$ 就能互相转换。不要只翻转插值公式，却保留原来的速度符号或步长；那会把积分推向相反方向。这里对代码的说明固定到 <a href="https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/models/pi0.py" target="_blank" rel="noopener">openpi 215abfb · pi0.py</a> 的 <code>compute_loss</code> / <code>sample_actions</code>，不把未来main分支默认配置当作论文常量。</p>
+<h3>教学算例：两套方向给出同一更新</h3>
+<div class="note" data-example="flow">取 $A=2$、$\epsilon=-1$。论文记号 $\tau=0.4$ 与代码记号 $s=0.6$ 都给出 $x=0.20$。配对目标速度分别为 $+3$ 和 $-3$；用 $\Delta\tau=+0.1$ 或 $\Delta s=-0.1$，都得到 $x'=0.50$。这里使用已知训练配对的目标速度做符号检查，真实推理只能使用模型预测，不能偷看数据终点。</div>
+<p>直观上，条件flow matching用“随机中间状态→应有速度”的监督来训练；ODE求解器则负责把局部预测串起来。网络误差与数值积分误差不同：增大模型不保证可无限减少积分步数，换高阶求解器也不保证修复错误的条件理解。</p>
+
+<h2 id="pi0-training-loop">8. 从训练样本到一块动作的完整流程</h2>
+
+<h3>一次训练更新</h3>
+<ol>
+<li>取多相机、指令、机器人状态和示范动作块；执行相应数据变换、归一化与缺失维处理。</li>
+<li>采样与动作块同形的噪声和生成时间；选定一套一致的插值、速度目标与时间分布。</li>
+<li>视觉/语言走VLM权重，状态/带噪动作走动作专家权重，按块mask交互。</li>
+<li>从动作位置读出向量场，计算有效动作元素上的回归损失，按训练方案更新参数。</li>
+</ol>
+<h3>一次部署调用</h3>
+<ol>
+<li>对这次固定条件建立前缀K/V；初始化整个动作块为高斯噪声。</li>
+<li>循环 $K$ 次：编码当前带噪动作与生成时间，运行专家，按求解器更新。</li>
+<li>完成后再反归一化、选择有效维与执行前缀；生成时间推进不是机器人已经运动。</li>
+<li>按执行协议重新观测并调用。不要在未验证的控制接口上直接下发学习策略输出。</li>
+</ol>
+<p>可用 $T_{\rm call}\approx T_{\rm encode}+K T_{\rm expert}+T_{\rm I/O}$ 粗分成本。缓存把重复视觉编码变成一次，不会把专家迭代也变成一次。任务循环还要考虑采集、网络、队列、反归一化和底层控制；用单层forward测速不能代替端到端延迟。</p>
+
+<h2 id="pi0-action-contract">9. 真机接口：形状对了，语义也可能错</h2>
+
+<p><b>教学设定：</b> 假设双臂各6个关节加1个夹爪通道，每个动作点共14维，50步块就是 $50\times14$ 个连续值。这只是说明张量含义，不表示所有π0平台固定采用14维。统一padding到某个最大维度，也不能消除左右臂顺序、角度单位或夹爪正负方向的差异。</p>
+<table>
+<tr><th>接口问题</th><th>可能出现的现象</th><th>先做的离线检查</th></tr>
+<tr><td>绝对位置 / 增量混淆</td><td>尺度似乎正常，执行却持续漂移</td><td>用同一日志还原目标序列，核对参考坐标与累积规则</td></tr>
+<tr><td>关节 / 末端动作混淆</td><td>数组维数接近，却不能用于同一控制器</td><td>检查控制模式与旋转表示，不用猜测或直接试机</td></tr>
+<tr><td>归一化统计不匹配</td><td>预测范围异常或特定维偏置很大</td><td>对已知示范做normalize→inverse往返测试</td></tr>
+<tr><td>夹爪 / 本体通道顺序错误</td><td>动作语义被交换，语言理解看似失效</td><td>打印字段名映射，与数据和硬件契约逐项对照</td></tr>
+</table>
+<p>50Hz对应20ms控制点间隔；若另一个系统用相同50步却以25Hz执行，覆盖的物理时间就不同。只有数据重采样、动作定义与低层控制都一致时，才能讨论同一“chunk长度”的迁移。</p>
+
+<h2 id="pi0-research-plan">10. 研究设计：把语义能力、生成能力和执行能力拆开</h2>
+
+<p><b>研究建议。</b> 三组实验分别回答不同问题：①更换指令但保持物体/场景相近，检查语义条件；②保持条件与数据，扫描积分步数/专家容量，检查连续生成；③保持checkpoint和采样器，改变执行前缀与调度，检查系统闭环。将三组变量一起改动，通常无法知道收益来自哪里。</p>
+<p>再做一个低成本诊断：固定观测，多次采样动作块并画出有效动作维的分布，检查是否存在离群、归一化错误或不合理的模式切换。它可以帮助发现接口问题，但不包含动作执行后的状态变化，不能替代闭环成功率。</p>
+<blockquote>读完应能自己解释：为什么动作token不必离散？为什么前缀K/V能缓存？论文和代码速度符号为何相反却都正确？一个50步动作块与模型调用频率是什么关系？这四个接口问题比背住“3B+300M”更有复现价值。</blockquote>
+
 <p><b>参考</b>：<a href="https://arxiv.org/html/2410.24164v3" target="_blank" rel="noopener">π0论文v3（IV、V、附录B/D）</a> · <a href="https://www.pi.website/blog/pi0" target="_blank" rel="noopener">官方博客</a> · <a href="https://github.com/Physical-Intelligence/openpi" target="_blank" rel="noopener">openpi</a>。</p>
 
 <nav class="model-nav"><span><a href="./diffusion-policy.html">← Diffusion Policy</a></span><span><a href="./pi05.html">π0.5 →</a></span></nav>
