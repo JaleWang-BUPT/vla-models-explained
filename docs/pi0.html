@@ -76,70 +76,29 @@ p,li,figcaption{overflow-wrap:anywhere}
 
 <p class="kicker">2024 · PHYSICAL INTELLIGENCE</p>
 <h1>π0 精读</h1>
-<h2>1. 问题：语义与高频控制之间的鸿沟</h2>
-<p>2024 年的 VLA（RT-2、OpenVLA 一系）把动作离散成 token 自回归生成——这在语义层面优雅，但在<b>高频灵巧操作</b>上撞墙。论文原文的判断是：高频动作块与高度灵巧任务“对先前的自回归 VLA 构成主要挑战”——离散化有精度损失、逐 token 串行解码慢、自回归逐点生成难以表达连续轨迹的多模态分布。π0 的答案：<b>动作连续生成 + flow matching</b>，成为第一个用 flow matching 产出高频动作块的 VLA。</p>
+<h2>1. 问题：把语义先验接到连续动作</h2>
+<p>π0研究的是：如何保留视觉语言预训练的知识，同时高效生成精细的连续动作块。原始OpenVLA等离散自回归方案有分桶和串行解码成本；这不代表自回归模型不能表达多模态，也不代表所有离散动作方法都不能输出chunk。π0选择<b>VLM权重 + 独立动作专家 + flow matching</b>，把视觉语义和连续动作分布放进一个有结构的注意力系统。</p>
 <h2>2. 架构精读</h2>
-<h3>2.1 双权重块 + 同一序列（Transfusion 式）</h3>
-<p>π0 = <b>PaliGemma 3B</b>（SigLIP 视觉编码器 + Gemma 语言模型，互联网级预训练）+ <b>动作专家约 300M</b>（从头初始化），合计 <b>3.3B</b>。关键在交互方式：图像/语言 token 走 VLM 权重，机器人状态与带噪动作 token 走动作专家权重，但<b>所有 token 在同一序列里做联合 attention</b>——论文明确说这是“两个混合元素的 mixture of experts”式设计，灵感来自 <b>Transfusion</b>（单 Transformer 多目标训练）。动作专家不是接在 VLM 后面的另一个模型，而是同一次前向里并行工作的独立权重块。</p>
-<h3>2.2 Flow matching 动作块（H=50）与 β 采样</h3>
-<p>动作块记 $\mathbf{A}^\tau_t = [\mathbf{a}^\tau_t, ..., \mathbf{a}^\tau_{t+H-1}]$，动作地平线 <b>H=50</b>（50Hz 口径约 1 秒）。训练时把带噪动作 token 与时间步 $\tau$ 塞进序列，只对 H 个动作位置计算流匹配损失；$\tau$ <b>从一个偏移的 beta 分布采样，刻意强调更低（更噪）的时间步，并在截止值 s=0.999 以上完全不采样</b>——最难的“从纯噪声出发”那一段被过采样。推理从 $A^0_t \sim N(0, I)$ 出发沿学到的向量场从 $\tau=0$ 积分到 $\tau=1$（论文附录 A-D 给出各阶段推理耗时拆分）。</p>
-
-<div class="anim">
-<svg viewBox="0 0 640 230" role="img" aria-label="flow matching 动画">
-<defs>
-  <linearGradient id="gT" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e08a68"/><stop offset="1" stop-color="#c96442"/></linearGradient>
-  <linearGradient id="gG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8aa471"/><stop offset="1" stop-color="#71855c"/></linearGradient>
-  <linearGradient id="gA" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b98a4a"/><stop offset="1" stop-color="#a1732c"/></linearGradient>
-  <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-  <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse"><circle cx="1.6" cy="1.6" r="1.2" fill="#ded8ca"/></pattern>
-</defs>
-<rect x="1.5" y="1.5" width="637" height="227" rx="14" fill="#fdfcf9" stroke="#e5e1d8"/><rect x="1.5" y="1.5" width="637" height="227" rx="14" fill="url(#dots)" opacity="0.5"/>
-  <text x="40" y="36" font-size="15" fill="#6e6b64">噪声 z₁ ∼ N(0, I)</text>
-  <text x="440" y="36" font-size="15" fill="#6e6b64">动作块（50 Hz，未来 t 步）</text>
-  <line x1="90" y1="180" x2="520" y2="90" stroke="#e5e1d8" stroke-width="2"/><line x1="90" y1="140" x2="520" y2="150" stroke="#e5e1d8" stroke-width="2"/><line x1="90" y1="100" x2="520" y2="60" stroke="#e5e1d8" stroke-width="2"/>
-  <circle r="5" fill="#c96442" filter="url(#glow)"><animateMotion dur="2.6s" begin="0s" repeatCount="indefinite" path="M90,180 L520,90"/></circle><circle r="5" fill="#71855c" filter="url(#glow)"><animateMotion dur="2.6s" begin="0.5s" repeatCount="indefinite" path="M90,140 L520,150"/></circle><circle r="5" fill="#a1732c" filter="url(#glow)"><animateMotion dur="2.6s" begin="1s" repeatCount="indefinite" path="M90,100 L520,60"/></circle>
-  <g fill="#a09a8e"><circle cx="90" cy="180" r="5"/><circle cx="90" cy="140" r="5"/><circle cx="90" cy="100" r="5"/></g>
-  <g><rect x="520" y="81" width="46" height="18" rx="4" fill="#c96442" opacity="0.25"/><rect x="520" y="81" width="46" height="18" rx="4" fill="none" stroke="#c96442" stroke-width="1.6"/><rect x="520" y="141" width="46" height="18" rx="4" fill="#71855c" opacity="0.25"/><rect x="520" y="141" width="46" height="18" rx="4" fill="none" stroke="#71855c" stroke-width="1.6"/><rect x="520" y="51" width="46" height="18" rx="4" fill="#a1732c" opacity="0.25"/><rect x="520" y="51" width="46" height="18" rx="4" fill="none" stroke="#a1732c" stroke-width="1.6"/></g>
-  <text x="60" y="216" font-size="12.5" fill="#87847e">训练：回归直线速度场 v ≈ a − z₁　推理：从噪声出发沿直线 Euler 积分数步</text>
-</svg></div>
-<figure><img src="./assets/pi0_overview.png" loading="lazy" alt=""><figcaption><b>图 · π0 架构总览</b>（图片来源：Physical Intelligence, <i>π0</i>, arXiv:2410.24164，版权归原作者）</figcaption></figure>
+<h3>2.1 两组权重，通过有掩码的注意力交互</h3>
+<p>原始模型以约3B的PaliGemma为主干，配约300M动作专家。<b>图像/语言token走VLM权重，状态和带噪动作token走专家权重</b>；不同组通过attention接口交互，哪些token可见由mask决定，并非所有位置无条件双向可见。这种设计受Transfusion启发，但不是稀疏路由MoE的同义词，也不是简单在VLM最后接一个MLP。</p>
+<figure><img src="./assets/pi0_overview.png" loading="lazy" decoding="async" alt="π0 的视觉语言主干、动作专家与跨本体训练来源"><figcaption><b>论文方法图 · π0的跨本体数据、视觉语言主干与动作专家。</b> 注意右侧动作专家的状态输入与噪声输入，以及视觉语言先验和机器人训练数据的来源区别。<br>来源：<a href="https://arxiv.org/abs/2410.24164" target="_blank" rel="noopener">π0 论文 Fig. 3</a> · © Physical Intelligence</figcaption></figure>
+<h3>2.2 Flow matching：训练配对直线，不等于推理轨迹必直</h3>
+<p>沿原论文的时间方向，令噪声为 $\epsilon$、数据动作为 $A$，条件路径为 $A^\tau=(1-\tau)\epsilon+\tau A$，速度目标为 $A-\epsilon$。网络学习 $v_\theta(A^\tau,\tau,o)$，损失为 $\mathbb E\|v_\theta-(A-\epsilon)\|^2$。推理从 $\tau=0$ 的噪声积分到 $\tau=1$ 的动作，可用Euler更新 $A^{\tau+\Delta}=A^\tau+\Delta v_\theta(A^\tau,\tau,o)$。</p>
+<p><b>直线说的是训练时选定的噪声—数据配对路径。</b> 学到的条件向量场仍随位置和时间变化，采样轨迹可以弯曲；生成空间中的路径也不是末端的物理运动路径。因此不再用“光点沿直线移动”来冒充π0推理。原论文采用偏向更噪时间段的采样分布；复现时还要核对代码是否用了相反的时间记号和相应积分符号。</p>
+<h3>2.3 动作块与50Hz的正确含义</h3>
+<p>原论文使用 $H=50$ 的动作块。若动作点以50Hz执行，它覆盖约1秒；这不意味着每次都开环执行满1秒，更不意味着模型推理为50Hz。重规划调用率、实际执行前缀和低层伺服频率应分别报告。RTC、重叠平均与异步调度是额外的执行设计，不能仅靠插值推导出闭环稳定。</p>
+<figure><video controls playsinline loop preload="metadata" poster="./assets/pi0_box_1x-poster.jpg" aria-label="π0 官方纸盒装配演示，发布文件标为一倍速"><source src="./assets/pi0_box_1x.mp4" type="video/mp4">浏览器不支持此视频，请<a href="./assets/pi0_box_1x.mp4" target="_blank" rel="noopener">打开媒体文件</a>。</video><figcaption><b>官方视频 · 纸盒装配，源文件标为1×。</b> 观察连续动作和接触过程；这段演示不显示ODE内部采样，因此不能用它证明“积分沿直线”或测量模型调用频率。<br>来源：<a href="https://www.pi.website/blog/pi0" target="_blank" rel="noopener">π0 官方博客</a> · © Physical Intelligence · <a href="https://website.pi-asset.com/v2/upload/lowres_processed1xspeed_build_box_3.mp4" target="_blank" rel="noopener">原始文件</a><br>点击播放，可暂停、拖动进度或全屏；本站不自动播放，也不额外加速。</figcaption></figure>
 <h2>3. 训练与数据</h2>
-<p>预训练混合 = <b>自有灵巧操作数据（7 种机器人构型、68 个任务）+ 完整 OXE 数据集（22 种机器人）</b>，总量超过 <b>10,000 小时</b>。构型清单本身有信息量：双臂 UR5e（3 相机、14 维配置/动作空间）、Franka（2 相机、8 维）、双臂 ARX/AgileX（3 相机、14 维）等——不同本体靠统一的序列接口对齐，而不是各自微调。预训练后按任务微调，覆盖叠衣服、收桌子、装盒子等。</p>
-<figure><img src="./assets/pi0_teaser.png" loading="lazy" alt=""><figcaption><b>图 · π0 覆盖的任务谱</b>（图片来源：arXiv:2410.24164，版权归原作者）</figcaption></figure>
-
-<div class="anim">
-<svg viewBox="0 0 640 210" role="img" aria-label="动作块执行时间线">
-<defs>
-  <linearGradient id="gT" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e08a68"/><stop offset="1" stop-color="#c96442"/></linearGradient>
-  <linearGradient id="gG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8aa471"/><stop offset="1" stop-color="#71855c"/></linearGradient>
-  <linearGradient id="gA" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b98a4a"/><stop offset="1" stop-color="#a1732c"/></linearGradient>
-  <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-  <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse"><circle cx="1.6" cy="1.6" r="1.2" fill="#ded8ca"/></pattern>
-</defs>
-<rect x="1.5" y="1.5" width="637" height="207" rx="14" fill="#fdfcf9" stroke="#e5e1d8"/><rect x="1.5" y="1.5" width="637" height="207" rx="14" fill="url(#dots)" opacity="0.5"/>
-  <text x="30" y="52" font-size="14" fill="#6e6b64">时间 →</text>
-  <line x1="30" y1="70" x2="610" y2="70" stroke="#d9d3c5"/>
-  <rect x="30" y="58" width="220" height="24" rx="7" fill="#c96442" opacity="0.85"/>
-  <text x="140" y="74" text-anchor="middle" font-size="12" fill="#fff">chunk k（H=50 动作点）</text>
-  <rect x="250" y="58" width="120" height="24" rx="7" fill="#c96442" opacity="0.45"/>
-  <text x="310" y="74" text-anchor="middle" font-size="12" fill="#fff">只执行前 To 步</text>
-  <line x1="250" y1="46" x2="250" y2="96" stroke="#b15b4c" stroke-width="2" stroke-dasharray="4 4"/>
-  <text x="258" y="44" font-size="12" fill="#b15b4c">重规划点</text>
-  <rect x="30" y="108" width="180" height="24" rx="7" fill="#71855c" opacity="0.85"/>
-  <text x="120" y="124" text-anchor="middle" font-size="12" fill="#fff">chunk k+1（新观测）</text>
-  <rect x="210" y="108" width="160" height="24" rx="7" fill="#71855c" opacity="0.45"/>
-  <rect x="30" y="158" width="120" height="24" rx="7" fill="#a1732c" opacity="0.85"/>
-  <rect x="150" y="158" width="220" height="24" rx="7" fill="#a1732c" opacity="0.45"/>
-  <text x="330" y="194" font-size="12" fill="#87847e">每 0.5s 用最新观测重新预测整块、只兑现开头：平滑（块内一致）+ 闭环（块间重规划）</text>
-</svg></div>
+<p>本页采用论文v3口径：自采数据覆盖7种机器人构型、68项任务，并混合OXE数据；论文描述约10,000小时演示规模。官方博客采用的平台统计口径与论文并不完全相同，数字比较应先固定版本。<b>互联网视觉语言知识主要来自VLM初始化</b>，不要把π0的机器人训练阶段与π0.5显式混入web任务的共训配方混为一谈。</p>
+<figure><img src="./assets/pi0_teaser.png" loading="lazy" decoding="async" alt="π0 的机器人平台与灵巧操作任务示例"><figcaption><b>论文图 · 平台和任务示例。</b> 跨本体共享需要动作语义、单位、归一化和缺失维处理，不是单纯把向量补到同样长度。<br>来源：<a href="https://arxiv.org/abs/2410.24164" target="_blank" rel="noopener">π0 论文</a> · © Physical Intelligence</figcaption></figure>
 <h2>4. 结果与消融</h2>
-<p>三组对照值得记住：①<b>π0-small</b>：470M 的无 VLM 初始化消融版——即使它也<b>超过了 OpenVLA 和 Octo</b>，但远不如完整 π0，证明“互联网预训练主干”是性能来源；②与 OpenVLA / Octo 的“对齐训练量”（160k steps）对比，π0 全面占优，论文点破原因：<b>“OpenVLA 的自回归离散化架构不支持动作块”</b>；③OpenVLA 只在 UR5e 数据上训练时表现更好，但仍远低于 π0。2025 年开源 <a href="https://github.com/Physical-Intelligence/openpi" target="_blank" rel="noopener">openpi</a>（JAX/PyTorch 双实现，含 LoRA 微调配方），成为社区最重要的 VLA 基座。</p>
+<p>阅读原论文VI节时分开看：预训练基座的直接任务表现、语言跟随、新技能微调，以及复杂多阶段任务。无VLM初始化的π0-small消融用于研究预训练先验的作用，但网络结构也有差别，不能解释成“参数越大必然更好”。同样，基座结果、任务后训练结果和后来的openpi基准checkpoint不可混用。</p>
 <h2>5. 研究者注记</h2>
-<blockquote>①动作频率 ≠ 推理频率：50Hz 是动作块内动作点的时间参数化，模型重规划频率低得多——块间衔接（RTC/ensembling）是独立的工程问题。②“VLM + 小动作专家 + 分块注意力”是一个可复用骨架：SmolVLA 换成 SmolVLM2 照用，π0.5/π0.6/π0.7 沿用。③flow matching vs 扩散的取舍（直线路径、步数可调、确定性采样）在 DP 页的去噪动画语境下理解最直观：π0 本质上把“扩散的随机游走”换成了“直线流”。④β 采样强调“更噪的时间步”是个可迁移的训练技巧：最难的去噪段最值得学。</blockquote>
-<p><b>参考</b>：Black et al., <i>π0: A Vision-Language-Action Flow Model for General Robot Control</i>（<a href="https://arxiv.org/abs/2410.24164" target="_blank" rel="noopener">arXiv:2410.24164</a> · <a href="https://www.physicalintelligence.company/blog/pi0" target="_blank" rel="noopener">官方博客</a> · <a href="https://github.com/Physical-Intelligence/openpi" target="_blank" rel="noopener">openpi</a>）</p>
+<blockquote>值得复用的是模块接口，而不是一个万能叙事：分别消融VLM先验、动作专家容量、生成步数与执行视界。Flow与diffusion可通过特定路径/参数化联系，不能按“直线/弯曲、确定/随机”普遍二分。实验记录里同时写动作Hz、调用延迟、重规划率与真实执行时间戳，才能定位加速到底改善了哪一层。</blockquote>
+<p><b>参考</b>：<a href="https://arxiv.org/html/2410.24164v3" target="_blank" rel="noopener">π0论文v3（IV、V、附录B/D）</a> · <a href="https://www.pi.website/blog/pi0" target="_blank" rel="noopener">官方博客</a> · <a href="https://github.com/Physical-Intelligence/openpi" target="_blank" rel="noopener">openpi</a>。</p>
 
 <nav class="model-nav"><span><a href="./diffusion-policy.html">← Diffusion Policy</a></span><span><a href="./pi05.html">π0.5 →</a></span></nav>
 </main>
-<footer><div>本站是研究笔记，非官方资料；方法描述以各论文/官方博客为准，图片与视频版权归原作者（见各图注与 <a href="./credits.html">Credits</a>）。文本与自制动画以 MIT 协议提供 · <a href="https://github.com/JaleWang-BUPT/vla-models-explained" target="_blank" rel="noopener">GitHub 仓库</a></div></footer>
+<footer><div>本站是研究笔记，非官方资料；方法描述以各论文/官方博客为准，图片与视频版权归原作者（见各图注与 <a href="./credits.html">Credits</a>）。本站文字与代码以 MIT 协议提供；引用媒体不在此授权范围内 · <a href="https://github.com/JaleWang-BUPT/vla-models-explained" target="_blank" rel="noopener">GitHub 仓库</a></div></footer>
 </body>
 </html>

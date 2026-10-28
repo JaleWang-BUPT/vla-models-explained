@@ -1,467 +1,295 @@
-// 站点内容：每个条目是一个页面 { file, title, short, kicker, body, prev, next }
-// 正文为原创中文研究笔记（精读级 v3）；引用图片/视频的版权归原作者，图注逐条标注。
+// Research notes with paper figures and official demonstrations.
+// Presentation tokens, typography and layout remain in the original build.mjs.
+import { media } from './media.mjs';
 
-const FIG = (src, cap, cls = '') =>
-  `<figure${cls ? ` class="${cls}"` : ''}><img src="./assets/${src}" loading="lazy" alt=""><figcaption>${cap}</figcaption></figure>`;
-
-const VID = (src, cap) =>
-  `<figure><video src="./assets/${src}" controls playsinline preload="metadata"></video><figcaption>${cap}</figcaption></figure>`;
-
-/* ---------- SVG 公共件 ---------- */
-const SVGDEFS = `
-<defs>
-  <linearGradient id="gT" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e08a68"/><stop offset="1" stop-color="#c96442"/></linearGradient>
-  <linearGradient id="gG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8aa471"/><stop offset="1" stop-color="#71855c"/></linearGradient>
-  <linearGradient id="gA" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b98a4a"/><stop offset="1" stop-color="#a1732c"/></linearGradient>
-  <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-  <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse"><circle cx="1.6" cy="1.6" r="1.2" fill="#ded8ca"/></pattern>
-</defs>`;
-
-const STAGE = (w, hgt, inner) =>
-  `<rect x="1.5" y="1.5" width="${w - 3}" height="${hgt - 3}" rx="14" fill="#fdfcf9" stroke="#e5e1d8"/><rect x="1.5" y="1.5" width="${w - 3}" height="${hgt - 3}" rx="14" fill="url(#dots)" opacity="0.5"/>${inner}`;
-
-/* ---------- 动画 ---------- */
-
-// A1 DP：去噪出多模态分布
-const animDiffusion = `
-<div class="anim">
-<svg viewBox="0 0 640 268" role="img" aria-label="扩散策略去噪动画">${SVGDEFS}
-${STAGE(640, 268, `
-  <text x="60" y="40" font-size="15" fill="#6e6b64">噪声样本 x_T</text>
-  <text x="440" y="40" font-size="15" fill="#6e6b64">动作轨迹（多模态）</text>
-  <g opacity="1">
-    <animate attributeName="opacity" values="1;1;0;0;1" keyTimes="0;0.15;0.4;0.9;1" dur="6s" repeatCount="indefinite"/>
-    ${Array.from({ length: 26 }, (_, i) => {
-      const x = 60 + (i * 19) % 180, y = 95 + (i * 37) % 130;
-      return `<circle cx="${x}" cy="${y}" r="2.4" fill="#a09a8e"><animate attributeName="opacity" values="0.9;0.9;0;0;0.9" keyTimes="0;0.15;0.4;0.9;1" dur="6s" repeatCount="indefinite"/></circle>`;
-    }).join('')}
-  </g>
-  <path d="M60,215 C200,185 320,225 580,155" stroke="url(#gT)" stroke-width="3" fill="none" opacity="0"><animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.35;0.62;0.95;1" dur="6s" repeatCount="indefinite"/></path>
-  <path d="M60,215 C220,95 360,155 580,75" stroke="url(#gG)" stroke-width="3" fill="none" opacity="0"><animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.38;0.66;0.95;1" dur="6s" repeatCount="indefinite"/></path>
-  <path d="M60,215 C240,155 400,65 580,195" stroke="url(#gA)" stroke-width="3" fill="none" opacity="0"><animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.41;0.7;0.95;1" dur="6s" repeatCount="indefinite"/></path>
-  <circle r="5" fill="#c96442" filter="url(#glow)"><animateMotion dur="6s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;0.95;1" path="M60,215 C200,185 320,225 580,155"/><animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.35;0.55;0.95;1" dur="6s" repeatCount="indefinite"/></circle>
-  <text x="60" y="254" font-size="12.5" fill="#87847e">同一观测 → 去噪收敛到不同可行轨迹：回归头取均值落在两条轨迹之间，扩散模型落到其中一条</text>`)}
-</svg></div>`;
-
-// A1b DP：Push-T 多模态案例（从左/右推到同一终局）
-const animPushT = `
-<div class="anim">
-<svg viewBox="0 0 640 250" role="img" aria-label="Push-T 多模态动画">${SVGDEFS}
-${STAGE(640, 250, `
-  <rect x="300" y="80" width="90" height="90" rx="10" fill="#e9e4d8" stroke="#b9b2a2" stroke-width="2" transform="rotate(18 345 125)"/>
-  <text x="345" y="130" text-anchor="middle" font-size="15" fill="#6e6b64">T</text>
-  <circle cx="345" cy="210" r="12" fill="#d9d3c5" stroke="#b9b2a2"/>
-  <text x="345" y="240" text-anchor="middle" font-size="12.5" fill="#87847e">目标位置</text>
-  <path d="M60,40 C180,60 300,95 332,120" stroke="url(#gT)" stroke-width="3" fill="none" stroke-dasharray="560" stroke-dashoffset="560">
-    <animate attributeName="stroke-dashoffset" values="560;0;0;560" keyTimes="0;0.42;0.9;1" dur="6s" repeatCount="indefinite"/></path>
-  <path d="M60,215 C190,190 300,155 332,132" stroke="url(#gG)" stroke-width="3" fill="none" stroke-dasharray="560" stroke-dashoffset="560">
-    <animate attributeName="stroke-dashoffset" values="560;0;0;560" keyTimes="0;0.42;0.9;1" dur="6s" repeatCount="indefinite" begin="0.6s"/></path>
-  <circle r="5.5" fill="#c96442" filter="url(#glow)"><animateMotion dur="6s" repeatCount="indefinite" keyPoints="0;1;1;1" keyTimes="0;0.42;0.9;1" path="M60,40 C180,60 300,95 332,120"/></circle>
-  <circle r="5.5" fill="#71855c" filter="url(#glow)"><animateMotion dur="6s" begin="0.6s" repeatCount="indefinite" keyPoints="0;1;1;1" keyTimes="0;0.42;0.9;1" path="M60,215 C190,190 300,155 332,132"/></circle>
-  <text x="40" y="28" font-size="13.5" fill="#c96442">从左上推 · 策略 A</text>
-  <text x="40" y="205" font-size="13.5" fill="#71855c">从左下推 · 策略 B</text>`)}
-</svg></div>`;
-
-// A2 π0：flow matching 直线流
-const animFlow = `
-<div class="anim">
-<svg viewBox="0 0 640 230" role="img" aria-label="flow matching 动画">${SVGDEFS}
-${STAGE(640, 230, `
-  <text x="40" y="36" font-size="15" fill="#6e6b64">噪声 z₁ ∼ N(0, I)</text>
-  <text x="440" y="36" font-size="15" fill="#6e6b64">动作块（50 Hz，未来 t 步）</text>
-  ${[ [90,180,520,90], [90,140,520,150], [90,100,520,60] ].map(([x1,y1,x2,y2]) =>
-    `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#e5e1d8" stroke-width="2"/>`).join('')}
-  ${[ [90,180,520,90], [90,140,520,150], [90,100,520,60] ].map(([x1,y1,x2,y2],i) =>
-    `<circle r="5" fill="${['#c96442','#71855c','#a1732c'][i]}" filter="url(#glow)"><animateMotion dur="2.6s" begin="${i*0.5}s" repeatCount="indefinite" path="M${x1},${y1} L${x2},${y2}"/></circle>`).join('')}
-  <g fill="#a09a8e">${[ [90,180],[90,140],[90,100] ].map(([x,y]) => `<circle cx="${x}" cy="${y}" r="5"/>`).join('')}</g>
-  <g>${[ [520,90],[520,150],[520,60] ].map(([x,y],i) => `<rect x="${x}" y="${y-9}" width="46" height="18" rx="4" fill="${['#c96442','#71855c','#a1732c'][i]}" opacity="0.25"/><rect x="${x}" y="${y-9}" width="46" height="18" rx="4" fill="none" stroke="${['#c96442','#71855c','#a1732c'][i]}" stroke-width="1.6"/>`).join('')}</g>
-  <text x="60" y="216" font-size="12.5" fill="#87847e">训练：回归直线速度场 v ≈ a − z₁　推理：从噪声出发沿直线 Euler 积分数步</text>`)}
-</svg></div>`;
-
-// A2b π0：动作块执行时间线（H=50 与重规划）
-const animChunk = `
-<div class="anim">
-<svg viewBox="0 0 640 210" role="img" aria-label="动作块执行时间线">${SVGDEFS}
-${STAGE(640, 210, `
-  <text x="30" y="52" font-size="14" fill="#6e6b64">时间 →</text>
-  <line x1="30" y1="70" x2="610" y2="70" stroke="#d9d3c5"/>
-  <rect x="30" y="58" width="220" height="24" rx="7" fill="#c96442" opacity="0.85"/>
-  <text x="140" y="74" text-anchor="middle" font-size="12" fill="#fff">chunk k（H=50 动作点）</text>
-  <rect x="250" y="58" width="120" height="24" rx="7" fill="#c96442" opacity="0.45"/>
-  <text x="310" y="74" text-anchor="middle" font-size="12" fill="#fff">只执行前 To 步</text>
-  <line x1="250" y1="46" x2="250" y2="96" stroke="#b15b4c" stroke-width="2" stroke-dasharray="4 4"/>
-  <text x="258" y="44" font-size="12" fill="#b15b4c">重规划点</text>
-  <rect x="30" y="108" width="180" height="24" rx="7" fill="#71855c" opacity="0.85"/>
-  <text x="120" y="124" text-anchor="middle" font-size="12" fill="#fff">chunk k+1（新观测）</text>
-  <rect x="210" y="108" width="160" height="24" rx="7" fill="#71855c" opacity="0.45"/>
-  <rect x="30" y="158" width="120" height="24" rx="7" fill="#a1732c" opacity="0.85"/>
-  <rect x="150" y="158" width="220" height="24" rx="7" fill="#a1732c" opacity="0.45"/>
-  <text x="330" y="194" font-size="12" fill="#87847e">每 0.5s 用最新观测重新预测整块、只兑现开头：平滑（块内一致）+ 闭环（块间重规划）</text>`)}
-</svg></div>`;
-
-// A3 SmolVLA：异步推理
-const animAsync = `
-<div class="anim">
-<svg viewBox="0 0 640 220" role="img" aria-label="异步推理解释动画">${SVGDEFS}
-${STAGE(640, 220, `
-  <text x="30" y="60" font-size="14.5" fill="#6e6b64">GPU 推理（下一块）</text>
-  <rect x="30" y="72" width="580" height="26" rx="8" fill="#f0eee6"/>
-  <rect x="30" y="72" width="150" height="26" rx="8" fill="url(#gT)" opacity="0.9">
-    <animate attributeName="x" values="30;460;30" dur="5s" repeatCount="indefinite"/>
-  </rect>
-  <text x="30" y="140" font-size="14.5" fill="#6e6b64">机器人执行（动作块队列）</text>
-  ${[0,1,2,3,4].map(i => `<rect x="${30 + i * 118}" y="152" width="104" height="26" rx="8" fill="#71855c" opacity="${0.28 + i * 0.16}">
-    <animate attributeName="opacity" values="${[0.9,0.7,0.5,0.3,0.15][i]};0.15;${[0.9,0.7,0.5,0.3,0.15][i]}" keyTimes="0;0.5;1" dur="5s" repeatCount="indefinite"/>
-  </rect>`).join('')}
-  <line x1="70" y1="60" x2="70" y2="190" stroke="#b15b4c" stroke-width="2" stroke-dasharray="5 5">
-    <animate attributeName="x1" values="70;590;70" dur="5s" repeatCount="indefinite"/><animate attributeName="x2" values="70;590;70" dur="5s" repeatCount="indefinite"/>
-  </line>
-  <text x="400" y="206" font-size="12.5" fill="#87847e">红虚线 = 当前时刻：执行第 k 块时，GPU 已在算第 k+1 块</text>`)}
-</svg></div>`;
-
-// A4 π0.5 异构共训
-const animCotrain = `
-<div class="anim">
-<svg viewBox="0 0 640 240" role="img" aria-label="异构共训动画">${SVGDEFS}
-${STAGE(640, 240, `
-  <defs><path id="f1" d="M170,60 C300,60 330,95 430,110"/><path id="f2" d="M170,105 C300,105 340,112 430,118"/><path id="f3" d="M170,150 C300,150 340,128 430,126"/><path id="f4" d="M170,195 C300,195 330,140 430,134"/></defs>
-  ${[ ['多本体真机演示', 46], ['网络多模态数据', 91], ['语义标注（检测/指代）', 136], ['高层子任务标注', 181] ].map(([label, y], i) => `
-    <rect x="20" y="${y}" width="150" height="34" rx="9" fill="#f6f4ee" stroke="#d9d3c5"/>
-    <text x="95" y="${y + 22}" text-anchor="middle" font-size="13" fill="#1f1e1d">${label}</text>
-    <use href="#f${i + 1}" stroke="url(#gT)" stroke-width="2.2" fill="none" stroke-dasharray="7 8">
-      <animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.6s" repeatCount="indefinite"/>
-    </use>`).join('')}
-  <rect x="430" y="86" width="170" height="76" rx="14" fill="#ffffff" stroke="#c96442" stroke-width="2"/>
-  <text x="515" y="118" text-anchor="middle" font-size="15" fill="#1f1e1d">VLA 共训</text>
-  <text x="515" y="142" text-anchor="middle" font-size="12" fill="#6e6b64">动作 + 文本 + 检测 + 指代</text>
-  <text x="60" y="232" font-size="12.5" fill="#87847e">混合训练让一个模型既会“做”，也懂任务的语义结构与高层步骤</text>`)}
-</svg></div>`;
-
-// A5 π*0.6 RECAP 循环
-const animRecap = `
-<div class="anim">
-<svg viewBox="0 0 640 250" role="img" aria-label="RECAP 循环动画">${SVGDEFS}
-${STAGE(640, 250, `
-  <defs>
-    <path id="rc1" d="M250,70 C350,45 460,55 545,95" fill="none"/>
-    <path id="rc2" d="M555,125 C520,190 420,215 330,200" fill="none"/>
-    <path id="rc3" d="M300,185 C210,175 140,130 135,85" fill="none"/>
-  </defs>
-  ${[['演示', 'Demo', 90, 210], ['纠正', 'Coach', 95, 470], ['自主经验', 'Explore', 190, 300]].map(([t, e, y, x], i) => `
-    <circle cx="${x}" cy="${y}" r="44" fill="#ffffff" stroke="${['#71855c', '#a1732c', '#c96442'][i]}" stroke-width="2.6"/>
-    <text x="${x}" y="${y - 2}" text-anchor="middle" font-size="13.5" fill="#1f1e1d">${t}</text>
-    <text x="${x}" y="${y + 16}" text-anchor="middle" font-size="11" fill="#6e6b64">${e}</text>`).join('')}
-  <use href="#rc1" stroke="#71855c" stroke-width="2.4" fill="none" stroke-dasharray="8 7"><animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.5s" repeatCount="indefinite"/></use>
-  <use href="#rc2" stroke="#a1732c" stroke-width="2.4" fill="none" stroke-dasharray="8 7"><animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.5s" repeatCount="indefinite"/></use>
-  <use href="#rc3" stroke="#c96442" stroke-width="2.4" fill="none" stroke-dasharray="8 7"><animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.5s" repeatCount="indefinite"/></use>
-  <circle r="5.5" fill="#1f1e1d" filter="url(#glow)"><animateMotion dur="4.5s" repeatCount="indefinite" path="M250,70 C350,45 460,55 545,95 C520,190 420,215 330,200 C210,175 140,130 135,85 C160,55 210,58 250,70"/></circle>
-  <text x="320" y="242" text-anchor="middle" font-size="12.5" fill="#87847e">价值函数估计回报，优势（advantage）作为条件反哺策略：好动作被强化，差动作被规避</text>`)}
-</svg></div>`;
-
-// A5b π*0.6 信用分配时间线
-const animCredit = `
-<div class="anim">
-<svg viewBox="0 0 640 200" role="img" aria-label="信用分配动画">${SVGDEFS}
-${STAGE(640, 200, `
-  <line x1="40" y1="90" x2="600" y2="90" stroke="#d9d3c5" stroke-width="3"/>
-  <circle cx="90" cy="90" r="7" fill="#b15b4c"/><text x="90" y="122" text-anchor="middle" font-size="12" fill="#b15b4c">t=2 抓取角度错</text>
-  <circle cx="220" cy="90" r="6" fill="#a1732c"/><circle cx="330" cy="90" r="6" fill="#a1732c"/>
-  <text x="275" y="60" text-anchor="middle" font-size="12" fill="#a1732c">小偏差累积</text>
-  <circle cx="460" cy="90" r="9" fill="#8f2f22" filter="url(#glow)"/><text x="460" y="122" text-anchor="middle" font-size="12" fill="#8f2f22">t=14 失败暴露</text>
-  <path d="M90,150 C220,175 380,165 455,105" stroke="#c96442" stroke-width="2.2" fill="none" stroke-dasharray="7 7">
-    <animate attributeName="stroke-dashoffset" from="56" to="0" dur="1.4s" repeatCount="indefinite"/></path>
-  <text x="270" y="185" text-anchor="middle" font-size="12.5" fill="#87847e">价值函数沿时间回溯归因：把失败“记到”早期错误头上 —— 监督学习做不到这一点</text>`)}
-</svg></div>`;
-
-// A6 π0.7 条件化转向
-const animSteer = `
-<div class="anim">
-<svg viewBox="0 0 640 250" role="img" aria-label="条件化转向动画">${SVGDEFS}
-${STAGE(640, 250, `
-  <rect x="20" y="30" width="180" height="30" rx="9" fill="#f6f4ee" stroke="#d9d3c5"/><text x="110" y="50" text-anchor="middle" font-size="13" fill="#1f1e1d">语言指令（做什么）</text>
-  <rect x="230" y="30" width="180" height="30" rx="9" fill="#f6f4ee" stroke="#c96442"/><text x="320" y="50" text-anchor="middle" font-size="13" fill="#1f1e1d">子目标图像（做成什么样）</text>
-  <rect x="440" y="30" width="180" height="30" rx="9" fill="#f6f4ee" stroke="#a1732c"/><text x="530" y="50" text-anchor="middle" font-size="13" fill="#1f1e1d">元数据（多快/多好）</text>
-  ${[ ['#c96442', 'M150,120 C260,140 380,120 560,95'], ['#71855c', 'M150,125 C260,110 400,160 560,140'], ['#a1732c', 'M150,130 C280,180 420,175 560,185'] ].map(([c, d], i) => `
-    <path d="${d}" stroke="${c}" stroke-width="2.8" fill="none" stroke-dasharray="480" stroke-dashoffset="480">
-      <animate attributeName="stroke-dashoffset" from="480" to="0" begin="${i * 0.7}s" dur="1.8s" repeatCount="indefinite"/>
-    </path>`).join('')}
-  <rect x="20" y="105" width="110" height="40" rx="10" fill="#ffffff" stroke="#d9d3c5"/><text x="75" y="130" text-anchor="middle" font-size="12.5" fill="#6e6b64">同一观测</text>
-  <text x="596" y="96" font-size="11.5" fill="#c96442">策略 A</text>
-  <text x="596" y="145" font-size="11.5" fill="#71855c">策略 B</text>
-  <text x="596" y="190" font-size="11.5" fill="#a1732c">策略 C</text>
-  <text x="60" y="240" font-size="12.5" fill="#87847e">提示里多给“怎么做”的信息，同一个模型就能被精确转向：异构数据不再互相打架</text>`)}
-</svg></div>`;
-
-// A7 π0.7 世界模型子目标生成环
-const animWorld = `
-<div class="anim">
-<svg viewBox="0 0 640 220" role="img" aria-label="世界模型子目标生成动画">${SVGDEFS}
-${STAGE(640, 220, `
-  ${[['当前观测', 80, 90, '#71855c'], ['轻量世界模型', 270, 90, '#a1732c'], ['合成子目标图', 460, 90, '#c96442']].map(([t, x, y, c]) => `
-    <rect x="${x - 58}" y="${y - 28}" width="116" height="56" rx="12" fill="#ffffff" stroke="${c}" stroke-width="2.2"/>
-    <text x="${x}" y="${y + 5}" text-anchor="middle" font-size="13.5" fill="#1f1e1d">${t}</text>`).join('')}
-  <line x1="140" y1="90" x2="208" y2="90" stroke="#87847e" stroke-width="2.2" stroke-dasharray="6 6"><animate attributeName="stroke-dashoffset" from="48" to="0" dur="1.2s" repeatCount="indefinite"/></line>
-  <line x1="330" y1="90" x2="398" y2="90" stroke="#87847e" stroke-width="2.2" stroke-dasharray="6 6"><animate attributeName="stroke-dashoffset" from="48" to="0" dur="1.2s" repeatCount="indefinite"/></line>
-  <path d="M460,150 C380,200 200,200 120,152" stroke="#c96442" stroke-width="2.4" fill="none" stroke-dasharray="7 7">
-    <animate attributeName="stroke-dashoffset" from="56" to="0" dur="1.5s" repeatCount="indefinite"/></path>
-  <text x="290" y="196" text-anchor="middle" font-size="12.5" fill="#c96442">子目标作为提示条件 → 策略执行 → 新观测回流</text>
-  <text x="290" y="52" text-anchor="middle" font-size="12.5" fill="#87847e">没有真值子目标的任务，由世界模型在测试时合成视觉条件</text>`)}
-</svg></div>`;
-
-/* ---------- 页面 ---------- */
+const esc = s => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const LINK = (url, label) => '<a href="' + esc(url) + '" target="_blank" rel="noopener">' + label + '</a>';
+const SOURCE = src => {
+  const m = media[src];
+  if (!m) throw new Error('Unregistered media: ' + src);
+  return '来源：' + LINK(m.source, m.label) + ' · © ' + m.owner +
+    (m.original ? ' · ' + LINK(m.original, '原始文件') : '') +
+    (m.transformation ? '<br>' + m.transformation : '');
+};
+const IMG = src => '<img src="./assets/' + src + '" loading="lazy" decoding="async" alt="' + esc(media[src].alt) + '">';
+const FIG = (src, cap) => '<figure>' + IMG(src) + '<figcaption>' + cap + '<br>' + SOURCE(src) + '</figcaption></figure>';
+const PAIR = (a, b, cap) => '<figure class="duo">' + IMG(a) + IMG(b) + '<figcaption>' + cap + '<br>' + SOURCE(a) + '</figcaption></figure>';
+const VID = (src, cap) => '<figure><video controls playsinline loop preload="metadata" poster="./assets/' +
+  src.replace(/\.mp4$/, '-poster.jpg') + '" aria-label="' + esc(media[src].alt) + '"><source src="./assets/' +
+  src + '" type="video/mp4">浏览器不支持此视频，请' + LINK('./assets/' + src, '打开媒体文件') +
+  '。</video><figcaption>' + cap + '<br>' + SOURCE(src) +
+  '<br>点击播放，可暂停、拖动进度或全屏；本站不自动播放，也不额外加速。</figcaption></figure>';
+const creditRows = Object.entries(media).map(([file, m]) => '<tr><td>' + file + '</td><td>' +
+  LINK(m.source, m.label) + (m.original ? '<br>' + LINK(m.original, '原始文件') : '') +
+  '</td><td>© ' + m.owner + '<br>' + (m.transformation || '沿用原图或官方媒体副本；未重绘内容。') + '</td></tr>').join('\n');
 
 export const pages = [
 {
-  file: 'index', short: '总览', title: 'VLA 模型图解 · 从 Diffusion Policy 到 π0.7',
-  body: `
+  file: "index",
+  short: "总览",
+  title: "VLA 模型图解 · 从 Diffusion Policy 到 π0.7",
+  body: String.raw`
 <p class="kicker">VLA METHODS, VISUALLY</p>
 <h1>从 Diffusion Policy 到 π0.7：VLA 方法精读图解</h1>
-<p>一份面向研究者的中文精读笔记，沿“<b>动作怎么生成、数据怎么用、泛化从哪来、可靠性怎么建</b>”四条线拆解六个代表性模型：<b>Diffusion Policy（2023）→ π0（2024）→ π0.5（2025）→ SmolVLA（2025）→ π*0.6（2025）→ π0.7（2026）</b>。每页固定结构：问题 → 方法精读（含公式与架构细节）→ 训练与实现 → 结果与消融 → 研究者注记。所有论文图与官方动画逐条署名；机制动画（✳）为本站自制的 SVG/SMIL，零 JS、可自由复用。</p>
-<div class="note">这六个模型恰好构成一条完整的因果链：DP 立住“动作=生成模型”→ π0 把它接进 VLM 与 50Hz 控制 → π0.5 解决场景泛化 → SmolVLA 证明范式可小型化 → π*0.6 用 RL 补可靠性 → π0.7 把前面所有数据源用“条件化”统一起来。读的时候建议对照每页的“研究者注记”。</div>
+<p>这份笔记沿“<b>动作怎么生成、数据怎么用、泛化从哪来、可靠性怎么验证</b>”四条线，阅读 Diffusion Policy、π0、π0.5、SmolVLA、π0.6 / π*0.6 与 π0.7。每页保留：问题 → 方法精读 → 训练与实现 → 结果 → 研究者注记。<b>Diffusion Policy 是视觉运动策略，不以语言条件作为原方法的组成部分</b>；这里把它作为连续动作生成的基础阅读，而不是将它追认为 VLA。</p>
+<div class="note">这是按研究问题组织的阅读路线，不是“后一篇全面取代前一篇”的单线谱系。所有图与动态素材来自论文或作者公开项目；图注区分方法图、任务演示和实验结果。官方展示能帮助理解行为，但不能替代完整评测，也不能从机器人视频反推出模型内部的采样路径。</div>
 <h2 id="timeline">时间线</h2>
 <ul class="timeline">
-  <li><span class="yr">2023 · RSS　</span><b>Diffusion Policy</b>：把动作生成变成去噪。多模态动作分布的表达第一次在真机上立住，15 个任务平均成功率 60.7%（此前 SOTA 44.6%）。</li>
-  <li><span class="yr">2024 · π0　</span><b>Physical Intelligence</b>：PaliGemma 3B + 300M flow matching 动作专家，7 构型 68 任务 + OXE 全集预训练，把语义先验接到 50Hz 灵巧操作。</li>
-  <li><span class="yr">2025 · π0.5　</span>：异构共训（网络多模态 + 多本体 + 语义标注），推理先出子任务再出动作，泛化到训练时没见过的家庭。</li>
-  <li><span class="yr">2025 · SmolVLA　</span><b>Hugging Face</b>：450M、481 个社区数据集 22.9K episodes 预训练，消费级 GPU 可训；异步推理响应快 30%、吞吐 2×。</li>
-  <li><span class="yr">2025 · π*0.6　</span>：RECAP 后训练（演示 + 纠正 + 自主经验 + 优势条件化），最难任务吞吐翻倍、失败率减半，咖啡做到全天连续。</li>
-  <li><span class="yr">2026 · π0.7　</span>：多样化上下文条件——提示里给“怎么做”（子目标图/元数据/策略），同一模型开箱达到专家特化水平，零样本跨本体叠衬衫。</li>
+<li><span class="yr">2023 · RSS　</span><b>Diffusion Policy</b>：条件去噪生成动作序列，再滚动执行。读它时区分“去噪时间”与“机器人执行时间”。</li>
+<li><span class="yr">2024 · π0　</span><b>Physical Intelligence</b>：预训练VLM与独立动作专家通过注意力交互，用flow matching生成连续动作块；50Hz是动作点频率，不是每秒调用模型50次。</li>
+<li><span class="yr">2025 · π0.5　</span>：异构数据共训练，结合FAST离散动作训练与连续动作专家，并联合学习高层语义子任务。</li>
+<li><span class="yr">2025 · SmolVLA　</span><b>Hugging Face</b>：450M级模型、公开社区数据和异步执行栈；研究重点是资源、任务效果与控制时延的共同权衡。</li>
+<li><span class="yr">2025 · π0.6 / π*0.6　</span>：先区分更强的基座与RECAP后训练。价值函数估计优势，优势标签条件化策略，自主经验与人工纠正共同进入训练。</li>
+<li><span class="yr">2026 · π0.7　</span>：加入多样上下文、观测记忆和可选视觉子目标，研究通用策略如何复用异质数据、组合技能并接受语言指导。</li>
 </ul>
 <h2 id="compare">谱系对比表</h2>
 <table>
-<tr><th>模型</th><th>年份</th><th>参数量</th><th>动作头</th><th>训练范式</th><th>开源</th></tr>
-<tr><td><a href="./diffusion-policy.html">Diffusion Policy</a></td><td>2023</td><td>数亿级（CNN/Transformer 两版）</td><td>DDPM 去噪（DDIM 可少步）</td><td>行为克隆（含动作 chunk + 滚动视界）</td><td><span class="badge b-oss">开源</span></td></tr>
-<tr><td><a href="./pi0.html">π0</a></td><td>2024</td><td>3.3B（PaliGemma 3B + 专家 300M）</td><td>Flow Matching（H=50 动作块）</td><td>Transfusion 式多目标预训练 + 微调</td><td><span class="badge b-oss">openpi</span></td></tr>
-<tr><td><a href="./pi05.html">π0.5</a></td><td>2025</td><td>与 π0 同量级</td><td>Flow Matching + 两阶段推理</td><td>异构共训（含网络多模态与语义标注）</td><td><span class="badge b-oss">openpi</span></td></tr>
-<tr><td><a href="./smolvla.html">SmolVLA</a></td><td>2025</td><td>450M</td><td>Flow Matching（n=50，层跳过）</td><td>社区数据（481 集 / 22.9K episodes）</td><td><span class="badge b-oss">开源</span></td></tr>
-<tr><td><a href="./pistar06.html">π*0.6</a></td><td>2025</td><td>π0.6 基座</td><td>Flow Matching + 优势条件化</td><td>RECAP：演示 + 纠正 + 自主经验</td><td>未开源</td></tr>
-<tr><td><a href="./pi07.html">π0.7</a></td><td>2026</td><td>π0.6 量级</td><td>Flow Matching + 多模态提示条件</td><td>多样化上下文条件训练</td><td>未开源</td></tr>
+<tr><th>模型</th><th>主要问题</th><th>动作生成</th><th>关键区别</th><th>研究入口</th></tr>
+<tr><td><a href="./diffusion-policy.html">Diffusion Policy</a></td><td>多模态视觉动作分布</td><td>条件扩散 + 滚动视界</td><td>不含语言主干；CNN / Transformer两类实现</td><td><a href="https://github.com/real-stanford/diffusion_policy" target="_blank" rel="noopener">作者代码</a></td></tr>
+<tr><td><a href="./pi0.html">π0</a></td><td>语义先验接入连续控制</td><td>Flow matching动作块</td><td>PaliGemma 3B + 约300M动作专家</td><td><a href="https://github.com/Physical-Intelligence/openpi" target="_blank" rel="noopener">openpi</a></td></tr>
+<tr><td><a href="./pi05.html">π0.5</a></td><td>新家庭中的长程任务</td><td>高层子任务 + 连续动作</td><td>FAST / flow混合训练与异构共训</td><td><a href="https://arxiv.org/abs/2504.16054" target="_blank" rel="noopener">论文与公开实现</a></td></tr>
+<tr><td><a href="./smolvla.html">SmolVLA</a></td><td>较低训练与部署成本</td><td>Flow matching，交错注意力</td><td>450M常用配置；可用异步推理栈</td><td><a href="https://huggingface.co/lerobot/smolvla_base" target="_blank" rel="noopener">公开权重</a></td></tr>
+<tr><td><a href="./pistar06.html">π0.6 / π*0.6</a></td><td>更强基座 / 从部署经验改进</td><td>连续动作 + 优势条件化</td><td>Gemma3-4B系主干与约860M专家；星号指RECAP版本</td><td><a href="https://arxiv.org/abs/2511.14759" target="_blank" rel="noopener">论文与模型卡</a></td></tr>
+<tr><td><a href="./pi07.html">π0.7</a></td><td>可转向的通用策略</td><td>多模态上下文条件化的flow matching</td><td>约5B动作策略；含MEM式记忆，世界模型另计</td><td><a href="https://www.pi.website/download/pi07.pdf" target="_blank" rel="noopener">论文与官方演示</a></td></tr>
 </table>
 <h2>四条研究主线</h2>
 <ol>
-<li><b>动作表示</b>：离散 token（RT-2/OpenVLA 一系）→ 回归 → CVAE（ACT）→ 扩散（Diffusion Policy）→ flow matching（π0 及之后全部）。判据有三：分布表达力（多模态）、推理步数可调（延迟换精度）、对高频连续控制的适配（50Hz 级动作点）。</li>
-<li><b>数据复用</b>：单任务演示 → 异构共训（π0.5：网络数据 + 语义标注）→ 社区数据（SmolVLA：10.6M 帧）→ 自主经验回收（π*0.6：价值函数当标签）→ 低质量数据经元数据“消毒”后入库（π0.7）。</li>
-<li><b>泛化来源</b>：π0.5 靠“见多”（地点规模曲线持续上升）→ π0.7 靠“条件化”（把数据差异显式写进提示），组合泛化开始像 LLM。</li>
-<li><b>可靠性</b>：模仿学习的小错误会复合（π*0.6 页的 Portafilter 案例）→ 价值函数给经验打标签 → 优势条件化让策略“优于训练数据”。</li>
+<li><b>动作表示</b>：离散token、确定性回归、潜变量、扩散和flow是可比较的设计，不是严格的性能等级。比较时固定数据、动作空间、硬件与采样预算。</li>
+<li><b>数据复用</b>：π0.5用不同监督目标连接异构样本；SmolVLA整理社区数据；RECAP给经验估计优势；π0.7显式描述行为质量与策略差异。这些机制并不自动让错误数据变成正确数据。</li>
+<li><b>泛化</b>：新物体、新场景、新任务和新本体是不同测试。看清哪些组合未出现在训练中，是否提供子目标、语言教练或后续微调。</li>
+<li><b>系统可靠性</b>：成功率、任务进度、吞吐、尾延迟和人工接管率各有含义。少步采样、异步调度和RL解决的瓶颈不同，需要分别消融。</li>
 </ol>
+<p>阅读建议：先看论文方法图，再播放旁边的官方演示，最后对照“研究者注记”列出准备改变的变量。素材与版本口径见 <a href="./credits.html">Credits</a>。</p>
 `
 },
 {
-  file: 'diffusion-policy', short: 'Diffusion Policy', kicker: '2023 · RSS · COLUMBIA & TRI',
-  title: 'Diffusion Policy：把动作生成变成去噪（精读）', prev: 'index', next: 'pi0',
-  body: `
+  file: "diffusion-policy",
+  short: "Diffusion Policy",
+  kicker: "2023 · RSS · COLUMBIA & TRI",
+  title: "Diffusion Policy：把动作生成变成去噪（精读）",
+  prev: "index",
+  next: "pi0",
+  body: String.raw`
 <p class="kicker">2023 · RSS · CHI ET AL.（COLUMBIA / TRI）</p>
 <h1>Diffusion Policy 精读</h1>
-<h2>1. 问题：模仿学习的两个顽疾</h2>
-<p><b>多模态</b>：同一个观测下往往存在多条正确动作轨迹（从左绕和从右绕抓同一个杯子都对）。行为克隆若用 MSE 回归，模型学的是所有可行轨迹的<b>条件均值</b>——均值大概率落在两条可行轨迹之间，物理上不可执行。此前的解法（动作分类离散化、GMM 拟合、CVAE）各有各的表达瓶颈。</p>
-<p><b>误差复合</b>：闭环执行时，一步小偏差把机器人带进训练分布没覆盖的状态，下一步偏差更大。单步预测的策略没有“对未来一段时间的联合规划”，误差在时间上自由累积。</p>
+<h2>1. 问题：同一观测，为什么不止一种正确动作？</h2>
+<p>抓取、推动或绕行常有多条可行轨迹。<b>单个确定性MSE回归头</b>容易拟合条件均值，均值未必属于任何一条可行轨迹；这不是说所有行为克隆或所有回归模型都只能输出均值。Diffusion Policy学习观测条件下的动作分布，并一次生成未来一段动作。它仍是模仿学习：表达多模态，不等于自动解决分布偏移、失败恢复或安全控制。</p>
 <h2>2. 方法精读</h2>
-<h3>2.1 把 DDPM 搬到动作空间</h3>
-<p>前向过程对真值动作序列逐步加噪：$x^k = \\sqrt{\\alpha_k}\,x^{k-1} + \\sqrt{1-\\alpha_k}\,\\epsilon^{k-1}$，$k=1..T$；网络 $\\epsilon_\\theta(x^k, k, o)$ 以观测 $o$ 为条件预测噪声。一个漂亮的视角是论文把去噪解释为<b>学习率调度下的梯度下降</b>：$\\epsilon_\\theta$ 实际上是能量函数 $E(x)$ 的梯度场，步长就是噪声调度——论文实测 <b>iDDPM 的 Square Cosine Schedule</b> 在控制任务上最好。推理从纯噪声 $x^T$ 起步迭代 T 步；用 <b>DDIM</b> 解耦训练与推理迭代数，推理可以少步（实现默认 10 步 DDIM）来满足闭环实时性。</p>
-<h3>2.2 两个关键工程决策</h3>
-<ul>
-<li><b>滚动视界控制（receding horizon）</b>：预测未来 Tp 步、只执行前 To 步就重新观测再预测。Transformer 版取 Tp=16、To=8——chunk 提供时间一致性与平滑，滚动提供闭环性，“长程规划与闭环响应的平衡”。这是后来 action chunk 一切玩法（ACT、π0 的 H=50）的原型。</li>
-<li><b>视觉条件化只算一次</b>：去噪迭代 T 步中观测特征不变，因此<b>视觉编码只做一次</b>、被全部去噪步共享——推理成本大头被砍掉，也让视觉编码器可以端到端训练。</li>
-</ul>
-<h3>2.3 两种网络形态与视觉前端</h3>
-<p><b>CNN 版</b>：FiLM 条件化的时序卷积（一维时间 U-Net），适合低维状态输入、固定视界；<b>Transformer 版</b>：时序扩散 transformer（min-SNR 加权），缓解 CNN 版的“过平滑”（over-smoothing），在高频动作变化与<b>速度控制</b>任务上明显更好。视觉前端：<b>ResNet-18（不用 ImageNet 预训练）+ spatial softmax 池化（保留空间结构）+ GroupNorm 替换 BatchNorm</b>——GroupNorm 与权重 EMA 的组合是扩散训练稳定性的隐藏前提。超参口径：状态实验 batch 2048、图像实验 64；cosine 学习率调度，CNN 版 warmup 500 步、Transformer 版 1000 步。</p>
-${FIG('dp_policy_input_output.png', '<b>图 · 策略输入输出与 CNN/Transformer 两种形态</b>（图片来源：Chi et al., <i>Diffusion Policy</i>, arXiv:2303.04137，版权归原作者）')}
-${animDiffusion}
-<h2>3. 多模态的实证：Push-T 与 Multimodal Block Pushing</h2>
-<p>论文的招牌消融是 <b>Push-T</b>：把一个 T 形块推到目标位姿。同一观测下“从左推”和“从右推”都是可行解，MSE 回归学出“从中间穿过 T 块”的均值轨迹。下方官方仿真图展示了 DP 在多模态块 pushing 任务上学出的多解分布——每个 episode 收敛到不同解、都能成功：</p>
-${FIG('dp_multimodal_sim.png', '<b>图 · Multimodal Block Pushing：DP 学出的多解分布</b>（图片来源：<a href="https://github.com/real-stanford/diffusion_policy" target="_blank" rel="noopener">real-stanford/diffusion_policy</a> 仓库 media/，MIT License，版权归原作者）')}
-${animPushT}
-<h2>4. 结果与消融</h2>
-<p>跨 <b>11 个任务 / 4 个基准</b>系统评测（Robomimic、Push-T、Multimodal Block Pushing、Franka Kitchen + 真机 Push-T/翻杯/倒酱汁），相对既有 SOTA <b>平均提升 46.9%</b>；真机 Push-T 上做了 2 种架构 × 3 种视觉编码器的消融，并对比位置控制 vs 速度控制的动作空间；真机 Push-T 平均成功率达 <b>94%</b>（最优 checkpoint 口径）。</p>
+<h3>2.1 在动作空间中学习条件去噪</h3>
+<p>令干净动作块为 $A^0$，观测特征为 $o$。常见噪声预测写法是 $A^k=\sqrt{\bar\alpha_k}A^0+\sqrt{1-\bar\alpha_k}\epsilon$，训练最小化 $\mathbb E\|\epsilon-\epsilon_\theta(A^k,k,o)\|^2$。推理从高斯噪声出发反向去噪，最后得到动作序列。这里的 $k$ 是<b>生成过程的噪声步</b>，不是机器人真实时间；视频中机械臂走出的曲线也不是这个高维去噪过程的投影。</p>
+<p>网络输出与条件score存在参数化关系，可以用梯度场的视角理解；一般噪声预测网络不必显式来自一个可计算标量能量函数。DDPM与DDIM等采样器在随机性、步数与数值误差上不同，不能把所有扩散采样都叫必须走满训练步数的随机游走。</p>
+${FIG("dp_policy_input_output.png", "<b>论文图 · 从观测条件到动作序列。</b> 对照输入、时间维与输出动作块阅读；CNN和Transformer是动作网络的两类结构，不是“视觉/状态输入”的硬分工。")}
+<h3>2.2 预测视界、执行视界与重新观测</h3>
+<p>先预测 $T_p$ 个动作，只执行 $T_a\le T_p$ 个，再采新观测重新生成。这就是receding horizon：动作块利用短期时间结构，重新观测提供反馈。还要区分观测历史长度 $T_o$，不要把它与执行步数混用。较长执行前缀节省调用，但反馈更旧；较短前缀响应更快，计算与块间衔接压力也更大。</p>
+${VID("dp_receding_horizon.mp4", "<b>官方动态演示 · Push-T中的预测动作点与执行。</b> 重点观察彩色动作点、真实末端运动和下一次预测之间的关系；这不是本站绘制的去噪轨迹，也不是完整训练过程录像。")}
+<h3>2.3 视觉条件与两种动作网络</h3>
+<p>作者给出时序卷积U-Net与时序Transformer方案，分别用相应条件化结构接入观测。一次动作生成中的观测不变，可缓存视觉特征供多个去噪步使用。图像编码、空间特征提取、归一化、EMA与动作控制模式都会影响结果；减少去噪步数后，应重新测成功率和闭环时延，而不是只报告一次前向变快。</p>
+<h2>3. 多模态的实证：不要把两种推动任务混在一起</h2>
+<p><b>Push-T</b>是把T形块推到目标位姿；<b>Multimodal Block Pushing</b>使用不同的对象/目标组合检验多种行为模式。它们不是同一个基准。下面保留作者的对比图与官方仿真动画；这些分布与rollout比“画两条漂亮曲线”更接近论文的证据。</p>
+${FIG("dp_multimodal_sim.png", "<b>作者项目图 · 多模态块推动的策略对比。</b> 阅读模式覆盖与单次rollout的一致性，不把平均轨迹当作实际执行轨迹。")}
+${VID("dp_block_pushing.mp4", "<b>官方仿真动画 · Block Pushing。</b> 这是独立于真机Push-T的任务展示；展示片段不代表所有随机种子的成功率。")}
+<h2>4. 结果与消融：先固定论文版本</h2>
+<p>本页采用RSS 2023与官方项目页的口径：<b>12个任务、4类基准，作者报告平均相对改进46.9%</b>。这是相对既有方法的汇总比较，不是“提高46.9个百分点”，也不是任意任务的保证。后续IJRR版本扩展了实验，不应把不同版本的任务数、平均成功率和最优checkpoint混成同一结论。</p>
 <h2>5. 局限与研究者注记</h2>
-<blockquote>①推理成本是扩散动作头的原罪：T 步去噪 × 每步全网络前向。DP 用“视觉只编码一次 + DDIM 少步”压成本，π0 换成直线路径的 flow matching 把步数压到个位数——这是理解后续所有动作头演化的主线。②DP 仍是纯 BC：它表达了多模态，但没有解决“错了会复合”——π*0.6 页面会讲这个坑怎么用 RL 填。③它把“策略=生成模型”这个视角立住了，VLA 时代所有主流动作头都是它的后裔。④复现入口：<a href="https://github.com/real-stanford/diffusion_policy" target="_blank" rel="noopener">real-stanford/diffusion_policy</a> 与 LeRobot 的 <code>diffusion</code> 策略实现。</blockquote>
-<p><b>参考</b>：Chi et al., <i>Diffusion Policy: Visuomotor Policy Learning via Action Diffusion</i>, RSS 2023（<a href="https://arxiv.org/abs/2303.04137" target="_blank" rel="noopener">arXiv:2303.04137</a> · <a href="https://www.diffusion-policy.cs.columbia.edu/" target="_blank" rel="noopener">项目页</a>）</p>
+<blockquote>复现时先固定：动作是位置还是速度、观测/预测/执行视界、噪声调度、采样器和训练数据。若研究加速，报告采样步数—成功率—尾延迟曲线；若研究鲁棒性，单独设计扰动与恢复评测。DP本身不引入语言条件，也不能仅凭多模态表达能力推断长程规划或安全性。</blockquote>
+<p><b>参考</b>：<a href="https://arxiv.org/abs/2303.04137v4" target="_blank" rel="noopener">RSS 2023论文版本</a> · <a href="https://diffusion-policy.cs.columbia.edu/" target="_blank" rel="noopener">官方项目与动态素材</a> · <a href="https://github.com/real-stanford/diffusion_policy" target="_blank" rel="noopener">作者实现</a>。</p>
 `
 },
 {
-  file: 'pi0', short: 'π0', kicker: '2024 · PHYSICAL INTELLIGENCE',
-  title: 'π0：VLM 主干 + Flow Matching 动作专家（精读）', prev: 'diffusion-policy', next: 'pi05',
-  body: `
+  file: "pi0",
+  short: "π0",
+  kicker: "2024 · PHYSICAL INTELLIGENCE",
+  title: "π0：VLM 主干 + Flow Matching 动作专家（精读）",
+  prev: "diffusion-policy",
+  next: "pi05",
+  body: String.raw`
 <p class="kicker">2024 · PHYSICAL INTELLIGENCE</p>
 <h1>π0 精读</h1>
-<h2>1. 问题：语义与高频控制之间的鸿沟</h2>
-<p>2024 年的 VLA（RT-2、OpenVLA 一系）把动作离散成 token 自回归生成——这在语义层面优雅，但在<b>高频灵巧操作</b>上撞墙。论文原文的判断是：高频动作块与高度灵巧任务“对先前的自回归 VLA 构成主要挑战”——离散化有精度损失、逐 token 串行解码慢、自回归逐点生成难以表达连续轨迹的多模态分布。π0 的答案：<b>动作连续生成 + flow matching</b>，成为第一个用 flow matching 产出高频动作块的 VLA。</p>
+<h2>1. 问题：把语义先验接到连续动作</h2>
+<p>π0研究的是：如何保留视觉语言预训练的知识，同时高效生成精细的连续动作块。原始OpenVLA等离散自回归方案有分桶和串行解码成本；这不代表自回归模型不能表达多模态，也不代表所有离散动作方法都不能输出chunk。π0选择<b>VLM权重 + 独立动作专家 + flow matching</b>，把视觉语义和连续动作分布放进一个有结构的注意力系统。</p>
 <h2>2. 架构精读</h2>
-<h3>2.1 双权重块 + 同一序列（Transfusion 式）</h3>
-<p>π0 = <b>PaliGemma 3B</b>（SigLIP 视觉编码器 + Gemma 语言模型，互联网级预训练）+ <b>动作专家约 300M</b>（从头初始化），合计 <b>3.3B</b>。关键在交互方式：图像/语言 token 走 VLM 权重，机器人状态与带噪动作 token 走动作专家权重，但<b>所有 token 在同一序列里做联合 attention</b>——论文明确说这是“两个混合元素的 mixture of experts”式设计，灵感来自 <b>Transfusion</b>（单 Transformer 多目标训练）。动作专家不是接在 VLM 后面的另一个模型，而是同一次前向里并行工作的独立权重块。</p>
-<h3>2.2 Flow matching 动作块（H=50）与 β 采样</h3>
-<p>动作块记 $\\mathbf{A}^\\tau_t = [\\mathbf{a}^\\tau_t, ..., \\mathbf{a}^\\tau_{t+H-1}]$，动作地平线 <b>H=50</b>（50Hz 口径约 1 秒）。训练时把带噪动作 token 与时间步 $\\tau$ 塞进序列，只对 H 个动作位置计算流匹配损失；$\\tau$ <b>从一个偏移的 beta 分布采样，刻意强调更低（更噪）的时间步，并在截止值 s=0.999 以上完全不采样</b>——最难的“从纯噪声出发”那一段被过采样。推理从 $A^0_t \\sim N(0, I)$ 出发沿学到的向量场从 $\\tau=0$ 积分到 $\\tau=1$（论文附录 A-D 给出各阶段推理耗时拆分）。</p>
-${animFlow}
-${FIG('pi0_overview.png', '<b>图 · π0 架构总览</b>（图片来源：Physical Intelligence, <i>π0</i>, arXiv:2410.24164，版权归原作者）')}
+<h3>2.1 两组权重，通过有掩码的注意力交互</h3>
+<p>原始模型以约3B的PaliGemma为主干，配约300M动作专家。<b>图像/语言token走VLM权重，状态和带噪动作token走专家权重</b>；不同组通过attention接口交互，哪些token可见由mask决定，并非所有位置无条件双向可见。这种设计受Transfusion启发，但不是稀疏路由MoE的同义词，也不是简单在VLM最后接一个MLP。</p>
+${FIG("pi0_overview.png", "<b>论文方法图 · π0的跨本体数据、视觉语言主干与动作专家。</b> 注意右侧动作专家的状态输入与噪声输入，以及视觉语言先验和机器人训练数据的来源区别。")}
+<h3>2.2 Flow matching：训练配对直线，不等于推理轨迹必直</h3>
+<p>沿原论文的时间方向，令噪声为 $\epsilon$、数据动作为 $A$，条件路径为 $A^\tau=(1-\tau)\epsilon+\tau A$，速度目标为 $A-\epsilon$。网络学习 $v_\theta(A^\tau,\tau,o)$，损失为 $\mathbb E\|v_\theta-(A-\epsilon)\|^2$。推理从 $\tau=0$ 的噪声积分到 $\tau=1$ 的动作，可用Euler更新 $A^{\tau+\Delta}=A^\tau+\Delta v_\theta(A^\tau,\tau,o)$。</p>
+<p><b>直线说的是训练时选定的噪声—数据配对路径。</b> 学到的条件向量场仍随位置和时间变化，采样轨迹可以弯曲；生成空间中的路径也不是末端的物理运动路径。因此不再用“光点沿直线移动”来冒充π0推理。原论文采用偏向更噪时间段的采样分布；复现时还要核对代码是否用了相反的时间记号和相应积分符号。</p>
+<h3>2.3 动作块与50Hz的正确含义</h3>
+<p>原论文使用 $H=50$ 的动作块。若动作点以50Hz执行，它覆盖约1秒；这不意味着每次都开环执行满1秒，更不意味着模型推理为50Hz。重规划调用率、实际执行前缀和低层伺服频率应分别报告。RTC、重叠平均与异步调度是额外的执行设计，不能仅靠插值推导出闭环稳定。</p>
+${VID("pi0_box_1x.mp4", "<b>官方视频 · 纸盒装配，源文件标为1×。</b> 观察连续动作和接触过程；这段演示不显示ODE内部采样，因此不能用它证明“积分沿直线”或测量模型调用频率。")}
 <h2>3. 训练与数据</h2>
-<p>预训练混合 = <b>自有灵巧操作数据（7 种机器人构型、68 个任务）+ 完整 OXE 数据集（22 种机器人）</b>，总量超过 <b>10,000 小时</b>。构型清单本身有信息量：双臂 UR5e（3 相机、14 维配置/动作空间）、Franka（2 相机、8 维）、双臂 ARX/AgileX（3 相机、14 维）等——不同本体靠统一的序列接口对齐，而不是各自微调。预训练后按任务微调，覆盖叠衣服、收桌子、装盒子等。</p>
-${FIG('pi0_teaser.png', '<b>图 · π0 覆盖的任务谱</b>（图片来源：arXiv:2410.24164，版权归原作者）')}
-${animChunk}
+<p>本页采用论文v3口径：自采数据覆盖7种机器人构型、68项任务，并混合OXE数据；论文描述约10,000小时演示规模。官方博客采用的平台统计口径与论文并不完全相同，数字比较应先固定版本。<b>互联网视觉语言知识主要来自VLM初始化</b>，不要把π0的机器人训练阶段与π0.5显式混入web任务的共训配方混为一谈。</p>
+${FIG("pi0_teaser.png", "<b>论文图 · 平台和任务示例。</b> 跨本体共享需要动作语义、单位、归一化和缺失维处理，不是单纯把向量补到同样长度。")}
 <h2>4. 结果与消融</h2>
-<p>三组对照值得记住：①<b>π0-small</b>：470M 的无 VLM 初始化消融版——即使它也<b>超过了 OpenVLA 和 Octo</b>，但远不如完整 π0，证明“互联网预训练主干”是性能来源；②与 OpenVLA / Octo 的“对齐训练量”（160k steps）对比，π0 全面占优，论文点破原因：<b>“OpenVLA 的自回归离散化架构不支持动作块”</b>；③OpenVLA 只在 UR5e 数据上训练时表现更好，但仍远低于 π0。2025 年开源 <a href="https://github.com/Physical-Intelligence/openpi" target="_blank" rel="noopener">openpi</a>（JAX/PyTorch 双实现，含 LoRA 微调配方），成为社区最重要的 VLA 基座。</p>
+<p>阅读原论文VI节时分开看：预训练基座的直接任务表现、语言跟随、新技能微调，以及复杂多阶段任务。无VLM初始化的π0-small消融用于研究预训练先验的作用，但网络结构也有差别，不能解释成“参数越大必然更好”。同样，基座结果、任务后训练结果和后来的openpi基准checkpoint不可混用。</p>
 <h2>5. 研究者注记</h2>
-<blockquote>①动作频率 ≠ 推理频率：50Hz 是动作块内动作点的时间参数化，模型重规划频率低得多——块间衔接（RTC/ensembling）是独立的工程问题。②“VLM + 小动作专家 + 分块注意力”是一个可复用骨架：SmolVLA 换成 SmolVLM2 照用，π0.5/π0.6/π0.7 沿用。③flow matching vs 扩散的取舍（直线路径、步数可调、确定性采样）在 DP 页的去噪动画语境下理解最直观：π0 本质上把“扩散的随机游走”换成了“直线流”。④β 采样强调“更噪的时间步”是个可迁移的训练技巧：最难的去噪段最值得学。</blockquote>
-<p><b>参考</b>：Black et al., <i>π0: A Vision-Language-Action Flow Model for General Robot Control</i>（<a href="https://arxiv.org/abs/2410.24164" target="_blank" rel="noopener">arXiv:2410.24164</a> · <a href="https://www.physicalintelligence.company/blog/pi0" target="_blank" rel="noopener">官方博客</a> · <a href="https://github.com/Physical-Intelligence/openpi" target="_blank" rel="noopener">openpi</a>）</p>
+<blockquote>值得复用的是模块接口，而不是一个万能叙事：分别消融VLM先验、动作专家容量、生成步数与执行视界。Flow与diffusion可通过特定路径/参数化联系，不能按“直线/弯曲、确定/随机”普遍二分。实验记录里同时写动作Hz、调用延迟、重规划率与真实执行时间戳，才能定位加速到底改善了哪一层。</blockquote>
+<p><b>参考</b>：<a href="https://arxiv.org/html/2410.24164v3" target="_blank" rel="noopener">π0论文v3（IV、V、附录B/D）</a> · <a href="https://www.pi.website/blog/pi0" target="_blank" rel="noopener">官方博客</a> · <a href="https://github.com/Physical-Intelligence/openpi" target="_blank" rel="noopener">openpi</a>。</p>
 `
 },
 {
-  file: 'pi05', short: 'π0.5', kicker: '2025 · PHYSICAL INTELLIGENCE',
-  title: 'π0.5：异构共训与开放世界泛化（精读）', prev: 'pi0', next: 'smolvla',
-  body: `
+  file: "pi05",
+  short: "π0.5",
+  kicker: "2025 · PHYSICAL INTELLIGENCE",
+  title: "π0.5：异构共训与开放世界泛化（精读）",
+  prev: "pi0",
+  next: "smolvla",
+  body: String.raw`
 <p class="kicker">2025 · PHYSICAL INTELLIGENCE</p>
 <h1>π0.5 精读</h1>
-<h2>1. 问题：场景级泛化</h2>
-<p>π0 时代（含同期所有 VLA）的评测环境都与训练环境高度相似；商业机器人因此只敢进工厂和仓库。π0.5 把目标定为<b>在从未见过的家庭里完成长程任务</b>——收拾厨房（关柜门、把物品放进水槽）、收拾卧室（捡起地上所有衣服）——并且明确声明：目标不是新技能或更高灵巧度，而是<b>泛化本身</b>。训练演示仍然“通常短于一分钟、成功率不高”，泛化不是靠完美数据堆出来的。</p>
-<h2>2. 方法精读：共训 + 混合多模态样本 + 分层微调</h2>
-<p>π0.5 采用简单而清晰的<b>分层架构</b>：先在异构混合任务上预训练，再针对移动操作微调——微调数据同时含<b>底层动作样本</b>与<b>高层“语义”动作</b>（预测“pick up…”这类子任务标签）。推理时模型<b>先推断高层子任务，再以子任务为条件预测连续动作</b>（动作解码仍是 flow matching）。核心观察：VLA 继承自 VLM，训练样本可以是“图像、文本、检测框、动作”的任意组合——于是 π0.5 把共训做到了 VLM 数据之外：</p>
-${animCotrain}
-<p>此前工作已证明“混入 VLM 训练数据”能改善对新物体/新背景的泛化；π0.5 更进一步，设计了<b>混合多模态样本</b>（hybrid multimodal）：一条样本同时含图像观测、语言命令、物体检测、语义子任务预测与底层动作。官方博客把提示/标注形态画成四类，正对应本站下载的四张官方图：</p>
-${FIG('pi05_verbal.jpg', '<b>图 1 · 语言指令条件</b>（图片来源：Physical Intelligence 官方博客 <i>π0.5</i>，版权归原作者）', 'duo')}
-${FIG('pi05_subtask.jpg', '<b>图 2 · 高层子任务命令</b>（图片来源同上）', 'duo')}
-${FIG('pi05_detection.jpg', '<b>图 3 · 物体检测/指代标注</b>（图片来源同上）', 'duo')}
-${FIG('pi05_web.jpg', '<b>图 4 · 网络多模态数据</b>（图片来源同上）', 'duo')}
-<h3>2.1 实现细节里值得抄的三处</h3>
-<ul>
-<li>所有动作数据<b>按数据集各自的 1%/99% 分位归一化到 $[-1,1]$</b>；动作维度取全体数据集的最大维，低维本体 padding——跨本体数据的统一接口做法。</li>
-<li>语义命令以特定标记（如 <code>' > '</code>）追加到文本提示里，让“子任务预测”与“语言跟随”在同一模板下共存。</li>
-<li>评测用<b>部分得分</b>（partial credit）评分细则（附录 A-B 的任务评分 rubric）：把一半盘子放进水槽记约 50%——长程任务的成功率统计必须有这类协议，否则数字没有意义。</li>
-</ul>
+<h2>1. 问题：换一个家庭，原来会的技能还能用吗？</h2>
+<p>π0.5重点研究训练中未见家庭里的长程操作：任务需要的不仅是抓取动作，还包括识别物体用途、理解场景和选择下一子任务。这里的“开放世界泛化”有具体实验定义，不能直接翻译成任意陌生环境、任意新技能都能零样本成功。数据多样性、训练目标与高层决策共同构成方法，而不只是“把π0训练得更久”。</p>
+<h2>2. 方法精读：异构数据与混合动作表示</h2>
+<h3>2.1 不是每条样本都有完整动作标签</h3>
+<p>配方连接跨机器人动作数据、不同环境的机器人数据、高层语义任务以及网络视觉语言任务。不同样本可监督不同输出：描述、检测/指代、语义子任务或低层动作。<b>没有机器人动作标签的web样本，不等于补一个零动作当监督</b>；需要在共同序列接口里明确每种样本的目标与loss mask。</p>
+${PAIR("pi05_verbal.jpg", "pi05_subtask.jpg", "<b>官方训练样例 · 左：语言指令；右：语义子任务。</b> 它们说明条件与监督的形态，不证明每条训练样本同时具备所有模态。")}
+${PAIR("pi05_detection.jpg", "pi05_web.jpg", "<b>官方训练样例 · 左：检测/指代；右：网络多模态任务。</b> 研究重点是如何共享表示，同时保留任务对应的监督边界。")}
+<h3>2.2 FAST离散训练与连续动作专家</h3>
+<p>原论文的重要设计是结合<b>FAST动作token预测</b>与<b>flow matching动作专家</b>。离散训练便于沿用token预测配方，连续专家用于较快地产生动作块；两种动作表示通过attention mask隔离，避免真值token向带噪动作分支泄漏。抽象地可写 $L=L_{\rm CE}+\alpha L_{\rm FM}$，但不能据此假定每个阶段、每种样本都同时计算两项。</p>
+<p>论文IV节的分阶段方案先进行离散token预训练，再加入连续动作专家做后训练；具体公开checkpoint可能使用更新过的配方，复现应固定版本。<b>把π0.5只概括为“π0加web数据”会漏掉训练效率与动作表示这部分贡献。</b></p>
+<h3>2.3 高层先选择子任务，低层再执行动作</h3>
+<p>同一模型可先预测语义子任务 $\hat\ell_t$，再生成 $p(A_t\mid o_t,\ell,\hat\ell_t)$。例如总任务是清理厨房，当前子任务可能是拿起盘子。高层不是必须独立部署的另一个大模型，也不是先生成一串语言就自动获得长程规划保证；子任务更新频率、低层执行窗口和失败恢复仍需要设计。</p>
+${VID("pi05_plate_1x.mp4", "<b>官方视频 · 擦干盘子并放上沥水架，源文件标为1×。</b> 观察抓取、工具使用和阶段衔接；该片是行为示例，完整泛化结论仍来自论文的未见家庭评测。")}
 <h2>3. 结果与消融</h2>
-<p>评测在多个<b>训练时完全没见过的家庭</b>进行。三个系统性结论：①<b>泛化随训练地点数稳步上升</b>（语言跟随实验：随训练场景增加，对已见/未见物体类别的成功率都持续提高——场景多样性是可积累的资产）；②<b>共训配方消融</b>（V-C 节）逐一验证语义预测、web 数据等成分的边际贡献；③<b>高层推理消融</b>（V-E 节）：去掉子任务预测，长程任务的阶段衔接明显变差。任务从“把盘子放进水槽”到“用海绵擦溅洒”，失败常见但展现出类人的灵活应变。</p>
-<h2>4. 研究者注记</h2>
-<blockquote>①π0.5 把“数据工程”变成“接口工程”：难点不在收集更多数据，而在让异质数据共享同一个序列模板。②子任务先行的两阶段推理是分层策略的最小实现——不引入额外模型，只是让 VLM 部分先说一句话。③它仍然只解决“见过类似技能在新场景执行”；π0.7 的组合泛化（没见过的电器）是下一层。</blockquote>
-<p><b>参考</b>：Physical Intelligence, <i>π0.5: a Vision-Language-Action Model with Open-World Generalization</i>（<a href="https://arxiv.org/abs/2504.16054" target="_blank" rel="noopener">arXiv:2504.16054</a> · <a href="https://www.pi.website/blog/pi05" target="_blank" rel="noopener">官方博客</a>）</p>
+<p>对照论文V节分别看新家庭任务进度、训练地点规模、各类共训数据消融与高层推理消融。地点更多与表现提高的曲线，不证明仅靠地点数量即可泛化；去掉web数据、跨本体数据或高层监督的效果也依任务而变。长程任务常用<b>部分进度评分</b>，其平均分不能直接写成整任务成功率。</p>
+<h2>4. 训练与实现：最先核对的接口</h2>
+<ul>
+<li><b>动作归一化</b>：固定采用均值方差还是分位数、统计对应哪份数据；padding维与有效mask必须一致。</li>
+<li><b>多模态监督</b>：记录FAST目标、高层子任务和连续专家分别在哪些样本/阶段启用，避免标签与attention泄漏。</li>
+<li><b>部署协议</b>：写清高层是否自动产生、是否有人提供子任务、如何重新观测和判定失败。</li>
+</ul>
+<h2>5. 研究者注记</h2>
+<blockquote>可研究的不是抽象的“更多数据”，而是迁移路径：哪类辅助任务改善哪种泛化？语义子任务带来的是语言理解、阶段切换还是更好的数据划分？用固定机器人数据和训练预算的消融拆开回答。相机视角、动作语义与监督模板都是接口条件，不应默认为跨数据集天然一致。</blockquote>
+<p><b>参考</b>：<a href="https://arxiv.org/html/2504.16054v1" target="_blank" rel="noopener">π0.5论文v1（IV、V、附录）</a> · <a href="https://www.pi.website/blog/pi05" target="_blank" rel="noopener">官方博客与公开视频</a> · <a href="https://github.com/Physical-Intelligence/openpi" target="_blank" rel="noopener">公开实现</a>。</p>
 `
 },
 {
-  file: 'smolvla', short: 'SmolVLA', kicker: '2025 · HUGGING FACE',
-  title: 'SmolVLA：450M 的社区级 VLA（精读）', prev: 'pi05', next: 'pistar06',
-  body: `
+  file: "smolvla",
+  short: "SmolVLA",
+  kicker: "2025 · HUGGING FACE",
+  title: "SmolVLA：450M 的社区级 VLA（精读）",
+  prev: "pi05",
+  next: "pistar06",
+  body: String.raw`
 <p class="kicker">2025 · HUGGING FACE · LEROBOT 生态</p>
 <h1>SmolVLA 精读</h1>
-<h2>1. 问题：VLA 的资源墙</h2>
-<p>OpenVLA（7B）、RT-2-X 等验证了开放 VLA 的可行性，但训练要大集群、部署要大显存、依赖昂贵本体——学术实验室与爱好者被挡在门外。SmolVLA 的命题：<b>单张消费级 GPU 可训、CPU/消费 GPU 可部署</b>的 VLA，性能仍要有竞争力。答案分两半：架构上“小而精”，推理调度上“异步”。</p>
+<h2>1. 问题：小模型能否支撑可复现的真机研究？</h2>
+<p>SmolVLA同时考虑参数、公开数据和执行系统：以SmolVLM2为感知/语义主干，用flow matching专家产生动作，并在LeRobot中提供训练与异步执行。常用配置约450M。消费级设备可用是可复现性目标，不代表任意GPU、batch或相机数都能达到同一训练成本与控制率。</p>
 <h2>2. 架构精读</h2>
-<h3>2.1 SmolVLM2 主干 + 交错注意力动作专家</h3>
-<p>VLM 主干用 <b>SmolVLM2</b>（SigLIP 视觉编码器 + SmolLM2 语言模型，针对多图输入优化）；动作专家 $v_\\theta$ 以 <b>flow matching</b> 目标训练，从 VLM 特征生成动作块 $\\mathbf{A}_t = (a_t, ..., a_{t+n})$，<b>n=50</b>。专家的注意力块是<b>交错排列</b>的：cross-attention（读 VLM 特征，金色块）与 causal self-attention（动作 token 之间，浅黄块）交替，让 50 个动作 token 在小参数量下仍充分吃到视觉语义。训练超参：AdamW（$\\beta_1=0.9, \\beta_2=0.95$），图像统一缩放 <b>512×512</b>（与 VLM 输入口径一致）。</p>
-${FIG('smolvla_arch.png', '<b>图 · SmolVLA 架构</b>（图片来源：Shukor et al., <i>SmolVLA</i>, arXiv:2506.01844，版权归原作者）')}
-<h3>2.2 效率设计与三张消融表</h3>
-<ul>
-<li><b>视觉 token 削减</b>：压到最少必要量（论文 Visual tokens reduction 节），省掉小模型吃不消的长视觉序列。</li>
-<li><b>层跳过（layer skipping）</b>：推理时跳过 VLM 的部分上层。消融关键结论：<b>“500M VLM 跳层”优于“直接换 256M VLM”</b>（Table 8：VLM-256M 平均 75.5，500M 跳层更高）——深度比宽度值钱，跳层是免费的宽度缩减。</li>
-<li><b>专家容量消融</b>（Table 9）：专家隐藏宽度 ×0.50 → 平均 80.3，×0.25 → 73.8：容量可以砍，但要留下限。</li>
-<li><b>训练目标消融</b>（Table 10）：flow matching 显著优于 L1 回归。</li>
-<li><b>状态放哪</b>（States to VLM or Expert?）：状态投影进 VLM 前缀（Prefix + cross-attention，平均 80.3）优于放到专家后缀（73.3）——语义层应该“看到”本体状态。</li>
-</ul>
-<h3>2.3 数据：社区规模化</h3>
-<p>预训练完全来自 LeRobot 社区数据集：<b>481 个数据集、22.9K episodes、10.6M 帧</b>——比其他 SOTA 的预训练集小至少一个数量级。配套工作是把社区数据里混乱的相机视角<b>标准化</b>（统一内外参约定）并做任务标注，否则跨数据集训练无从谈起。</p>
-${animAsync}
-${FIG('smolvla_async.png', '<b>图 · 异步推理时序</b>（图片来源：arXiv:2506.01844，版权归原作者）')}
-<h2>3. 异步推理栈（精读）</h2>
-<p>同步执行下 GPU 推理期间机器人干等。SmolVLA 的异步栈（论文 Algorithm 1）：输入 horizon T、chunk 大小 n、队列阈值 $g \\in [0,1]$；初始观测先发 <b>Policy Server</b> 拿到第一块；之后每当队列长度低于阈值就送最新观测请求下一块——<b>执行第 k 块时第 k+1 块已在算</b>。官方口径：<b>响应快 30%、任务吞吐 2×</b>。</p>
-${FIG('lerobot_so100.webp', '<b>动图 · LeRobot 生态 SO-100 低成本臂</b>（图片来源：<a href="https://github.com/huggingface/lerobot" target="_blank" rel="noopener">huggingface/lerobot</a> 仓库 media/readme/，Apache-2.0，版权归原作者）')}
-<h2>4. 结果：小模型 vs 大模型的正面表</h2>
-<p>LIBERO（physical-intelligence/libero，1,693 episodes，每任务 10 trials）与 Meta-World（50 任务泛化）多任务训练对比——这是全文最硬的一张表：</p>
+<h3>2.1 VLM前缀与交错注意力动作专家</h3>
+<p>图像、语言与投影后的机器人状态进入VLM前缀，动作专家以其特征为条件。专家交替使用读前缀的cross-attention和动作token间的causal self-attention，而不是把π0的注意力结构原样缩小。用 $A_t=(a_t,\ldots,a_{t+n-1})$ 表示n个动作，避免把两端都包含的下标误数成n+1；论文常用chunk配置为50步。</p>
+${FIG("smolvla_arch.png", "<b>官方架构图 · 保留的VLM层与交错注意力专家。</b> 图中状态也参与前缀编码；cross-attention不是机器人每个控制步都重新跑一遍VLM的含义。")}
+<h3>2.2 效率设计不是免费的性能保证</h3>
+<p>模型保留VLM较早的部分层，并减少视觉token等开销。这是训练/模型配置上的截断，不是部署时可随意跳过任意已训练层。消融结果支持作者所测配置，但不能推广成“深度普遍冗余”或“跳层等同宽度缩减”。动作专家容量、状态放置和训练目标都有独立消融，比较时还应固定参数与训练预算。</p>
+<h3>2.3 社区数据标准化的实际含义</h3>
+<p>论文预训练采用481份社区数据集、约22.9K episodes和10.6M帧。工作包括清理任务标注、规范相机视角类别和数据接口；<b>视角类别规范不等于统一了所有机器人相机的内外参</b>。模拟基准的从VLM初始化实验、社区机器人预训练与真机任务微调，是需要区分的训练设置。</p>
+<h2>3. 异步推理栈：等待发生在哪里？</h2>
+<p>初始队列仍需等待第一块。之后按队列阈值请求新动作，在旧队列执行时并行推理；新块返回后，根据已经流逝的执行时间对齐、丢弃过期前缀并更新/聚合队列。不能把新块直接完整追加到末尾，否则动作可能对应旧观测。队列阈值太迟会耗尽，太早也可能增加无效推理；网络抖动和超时需要单独处理。</p>
+${FIG("smolvla_async.png", "<b>论文时序图 · PolicyServer与RobotClient。</b> 依次看①初始请求，②执行若干动作后提交新观测，③返回时对齐并更新动作队列；不是“永不等待”的保证。")}
+${VID("smolvla_official.mp4", "<b>官方四联动图 · 异步、同步、扰动与新物体。</b> 沿用官方对比内容，转为可暂停视频；各面板的任务/条件不完全相同，不能从这5秒循环独立估计泛化或加速比。")}
+<h2>4. 结果：修正基准与列名，保留实验条件</h2>
+<p>下表仅摘录<b>论文v1 Table 2的LIBERO</b>设置，列为Spatial / Object / Goal / Long。此处“机器人预训练”不是“是否异步”；SmolVLA这一组从VLM初始化，因此表中No也不意味着论文没有社区预训练模型。不同论文、后续checkpoint与异步真机实验不能拼成一个排行榜。</p>
 <table>
-<tr><th>模型</th><th>异步</th><th colspan="4">分项成功率 (%)</th><th>平均</th></tr>
-<tr><td>Octo</td><td>否</td><td>77.6</td><td>21.5</td><td>11.4</td><td>15.8</td><td>31.6</td></tr>
-<tr><td>π0 (3.5B-PaliGemma)</td><td>否</td><td>80.4</td><td>40.9</td><td>36.7</td><td>44.0</td><td>50.5</td></tr>
-<tr><td>π0 (3.5B)</td><td>是</td><td>71.8</td><td>48.2</td><td>41.7</td><td>30.0</td><td>47.9</td></tr>
-<tr><td><b>SmolVLA (0.24B)</b></td><td>否</td><td><b>86.4</b></td><td>46.4</td><td>35.0</td><td><b>60.0</b></td><td><b>57.0</b></td></tr>
-<tr><td><b>SmolVLA (0.45B)</b></td><td>否</td><td>82.5</td><td>41.8</td><td>45.0</td><td><b>60.0</b></td><td><b>57.3</b></td></tr>
+<tr><th>LIBERO · 论文Table 2</th><th>机器人预训练</th><th>Spatial</th><th>Object</th><th>Goal</th><th>Long</th><th>平均(%)</th></tr>
+<tr><td>π0 · VLM初始化</td><td>否</td><td>87</td><td>63</td><td>89</td><td>48</td><td>71.8</td></tr>
+<tr><td>π0 · 机器人预训练</td><td>是</td><td>90</td><td>86</td><td>95</td><td>73</td><td>86.0</td></tr>
+<tr><td>SmolVLA · 0.45B</td><td>否</td><td>90</td><td>96</td><td>92</td><td>71</td><td>87.3</td></tr>
 </table>
-<p>论文原话的力度：<b>SmolVLA 持续胜过 VLM 初始化的 π0，与机器人数据预训练版 π0 相当</b>——同时训练快约 40%、显存省 6×。</p>
+<p>异步系统另见论文Figure 5：Pick-Place计时实验的平均完成用时为13.75s → 9.70s，减少约29.5%；固定时间实验平均完成方块数为1.8 → 3.8。三项真机任务的平均成功指标则为78.3 → 73.3。<b>更快不等于每项任务更准</b>，“约2×吞吐”也不是模型前向本身快了2×。</p>
 <h2>5. 研究者注记</h2>
-<blockquote>①SmolVLA 与 π0 共享 flow matching 动作头，但把“规模叙事”换成“系统叙事”：层跳过、交错注意力、异步栈每一项都是系统工程，累积起来就是 2× 的实际吞吐——研究里容易被低估的这类贡献。②“跳层优于缩模型”的消融值得推广到所有 VLM+动作头的架构：主干深度在小数据动作学习里是冗余的。③社区数据（10.6M 帧）+ 标准化 = 可持续的预训练池，π0.7 的元数据“消毒”思路是它的自然延伸。</blockquote>
-<p><b>参考</b>：Shukor et al., <i>SmolVLA: A Vision-Language-Action Model for Affordable and Efficient Robotics</i>（<a href="https://arxiv.org/abs/2506.01844" target="_blank" rel="noopener">arXiv:2506.01844</a> · <a href="https://huggingface.co/blog/smolvla" target="_blank" rel="noopener">HF 博客</a> · <a href="https://github.com/huggingface/lerobot" target="_blank" rel="noopener">LeRobot</a>）</p>
+<blockquote>若研究运行时加速，至少同时记录模型耗时、观测年龄、队列长度、实际执行动作和任务结果。若研究小型化，分别消融VLM保留层、视觉token与专家宽度；若研究泛化，区分预训练与任务微调的数据。不要把“CPU能运行”与满足真机控制截止期划等号。</blockquote>
+<p><b>参考</b>：<a href="https://arxiv.org/html/2506.01844v1" target="_blank" rel="noopener">SmolVLA论文v1（III、Table 2、Figure 5）</a> · <a href="https://huggingface.co/blog/smolvla" target="_blank" rel="noopener">官方博客</a> · <a href="https://github.com/huggingface/lerobot" target="_blank" rel="noopener">LeRobot实现</a>。</p>
 `
 },
 {
-  file: 'pistar06', short: 'π*0.6', kicker: '2025 · PHYSICAL INTELLIGENCE',
-  title: 'π*0.6：RECAP——用 RL 把 VLA 磨到全天可靠（精读）', prev: 'smolvla', next: 'pi07',
-  body: `
+  file: "pistar06",
+  short: "π*0.6",
+  kicker: "2025 · PHYSICAL INTELLIGENCE",
+  title: "π0.6 与 π*0.6：基座、RECAP 与经验学习（精读）",
+  prev: "smolvla",
+  next: "pi07",
+  body: String.raw`
 <p class="kicker">2025 · PHYSICAL INTELLIGENCE · RL 后训练</p>
-<h1>π*0.6 与 RECAP 精读</h1>
-<h2>1. 问题：从“偶尔成功”到“持续可靠”的鸿沟</h2>
-<p>模仿学习的失败模式有清晰的机制：<b>误差复合</b>。VLA 在真机上犯一个小错（比如以错误角度抓住咖啡机手柄），环境随即进入训练分布外的状态，下一步更容易犯错——而<b>真正的失败原因可能发生在几步之前</b>，监督学习只在“当时正确”的轨迹上训练，永远不会修正这种早期偏差。所以 VLA“偶尔成功容易，持续可靠很难”。π*0.6（π0.6 基座 + RECAP 后训练）给出了一套可复制的解法。</p>
-${animCredit}
-${animRecap}
-<h2>2. RECAP 精读（RL with Experience & Corrections via Advantage-conditioned Policies）</h2>
-<h3>2.1 价值函数：给“坏经验”打标签</h3>
-<p>自主经验数据的问题是<b>没有真值标签</b>——照抄自己的失败毫无意义。RECAP 训一个<b>价值函数</b>：预测“当前处境相对其他处境有多好”（博客用棋局类比：预测从当前盘面赢棋的概率）。有了它，就能对一段自主 rollout 做回溯归因——哪怕失败发生在最后一步，也能把“以错误角度抓 Portafilter”标记为错误。信用分配问题（早期错误、晚期暴露）由此被价值函数的回溯性质解决。</p>
-<h3>2.2 优势条件化：策略优于训练数据</h3>
-<p>“价值的相对变化”在 RL 里叫<b>优势（advantage）</b>。RECAP 的独特之处是把优势<b>作为条件输入策略</b>（advantage-conditioned），而不只是当加权系数：执行时直接要求 VLA “执行高优势动作”。这样学出的策略<b>可以优于产生它数据的平均质量</b>——数据里好坏混合，条件化让模型学会在推理时选择好的一端。</p>
-<h3>2.3 三个数据来源，两种“坏数据”的好用法</h3>
-<p>RECAP 训练数据 = <b>演示</b>（遥操作打底）+ <b>纠正</b>（专家在策略跑偏时接手拉回——含“如何修复错误/做得更好”的信息）+ <b>自主经验</b>（价值函数打标签）。博客强调的两个技巧：纠正数据教会“从错误恢复”，自主数据教会“不犯第一次错”——两种“坏经验”都被转化成训练信号。</p>
-${VID('pistar06_coffee.mp4', '<b>视频 · RECAP 训练后的咖啡制作</b>（视频来源：Physical Intelligence 官方博客 <i>π*0.6</i>，版权归原作者）')}
-<h2>3. 结果</h2>
-<ul>
-<li>最难的几个任务吞吐量 <b>翻倍以上</b>，失败率<b>至少减半</b>；</li>
-<li>咖啡制作从 <b>5:30am 连续跑到 11:30pm</b>（全天商用时段）；</li>
-<li><b>新家叠 50 件未见衣物</b>数小时不中断；真实工厂里装配并贴标 <b>59 个巧克力包装盒</b>；</li>
-<li>三段未剪辑长视频全部公开（官方博客“Real-time versions”链接）。</li>
-</ul>
-<h2>4. 研究者注记</h2>
-<blockquote>①RECAP 的可复用模板：价值函数 = 自主经验的标注器；优势条件化 = 让策略“高于数据分布”的旋钮；纠正数据 = 恢复行为的监督来源。三件事各自独立，可单独移植到任何 VLA 后训练管线。②注意数据闭环：RECAP 产生的自主经验 + 价值标注，就是 π0.7 页面里“带策略元数据并入通用训练”的那批数据——π*0.6 是特化模型，也是 π0.7 的数据工厂。③复现级细节官方未完全公开（价值模型结构、优势离散化方式），开源社区的对标实现可关注 openpi 的 RL 分支进展。</blockquote>
-<p><b>参考</b>：Physical Intelligence, <i>π*0.6: a VLA That Learns from Experience and Corrections</i>（<a href="https://www.pi.website/blog/pistar06" target="_blank" rel="noopener">官方博客</a>）</p>
+<h1>π0.6、π*0.6 与 RECAP 精读</h1>
+<h2>1. 先分清基座与星号版本</h2>
+<p><b>π0.6是基座，π*0.6是引入RECAP的版本</b>。模型卡描述：以Gemma3-4B初始化视觉语言主干，动作专家约860M，保留高层子任务与低层动作生成，并加入更丰富的条件。采用Knowledge Insulation训练时，动作专家的梯度不回传到主VLM；这与原π0的训练接口有区别。不能只把它理解为“π0.5改个版本号”或把星号等同更大的参数量。</p>
+<p>复现入口先读模型卡，而不是从展示视频推断版本：它给出了动作专家、注意力与训练梯度路径。基座的预训练任务片段不等于RECAP后的全天运行记录。</p>
+<h2>2. 问题：如何从自己遇到的错误中得到训练信号？</h2>
+<p>策略偏差会改变后续观测分布，错误可能累积。专家接管能补恢复行为；自主rollout还能提供成功、失败与速度差异。困难在于如何使用这些不等质量的数据，而不只是无条件复制全部动作。模仿学习并非“永远不会修错”，RECAP的重点是把奖励反馈、价值估计与条件化训练组织成可扩展配方。</p>
+${VID("pistar06_portafilter.mp4", "<b>官方失败案例 · 咖啡手柄操作。</b> 早期接触/抓取偏差可能在后续步骤暴露；视频说明诊断问题，不证明价值函数能唯一识别物理因果。")}
+<h2>3. RECAP精读</h2>
+<h3>3.1 用回报训练分布式价值函数</h3>
+<p>根据轨迹结果构造回报，训练一个多任务分布式价值模型。论文把经验回报离散到201个bin，用交叉熵学习，再取期望恢复标量价值。它估计从当前处境到任务完成的前景与时间代价，<b>不是每个动作的真值正确标签，也不是反向扫描录像就能确定早期错误原因的因果模型</b>。</p>
+<h3>3.2 从优势估计到输入条件</h3>
+<p>用不折扣的n步形式示意：$\hat A_t=\sum_{j=0}^{N-1}r_{t+j}+V(o_{t+N})-V(o_t)$；终止时处理bootstrap。按任务阈值得到二值指示 $I_t=\mathbf1[\hat A_t>\epsilon_\ell]$，然后训练条件策略 $\pi_\theta(a_t\mid o_t,\ell,I_t)$，也保留无条件训练分支。推理时请求正优势条件；这是<b>优势条件化</b>，不是简单以优势给每条loss乘权重，也不等同PPO梯度更新。</p>
+${FIG("pistar06_architecture.png", "<b>论文Fig. 3 · 独立价值模型与优势条件化VLA。</b> 对照二值标签、离散/连续训练目标及stop-gradient阅读；正条件能否带来改进仍依赖估计与数据覆盖。")}
+<h3>3.3 离线预训练、任务微调与真机迭代</h3>
+<p>流程是离线RL预训练 → 演示任务微调 → 部署并收集自主经验/专家接管 → 更新价值与策略，可重复迭代。论文把人工纠正按正优势处理，这是关于纠正质量的设计假设，不是所有人工接管天然最优。数据来源、奖励定义、优势阈值与条件dropout都有公开论文描述，不能再写成“论文完全没公开实现细节”；公开说明也不等于完整代码、数据与权重均已发布。</p>
+${VID("pistar06_intervention.mp4", "<b>官方动态示例 · 专家实时接管与纠正。</b> 这属于遥操作纠正数据；与π0.7的语言教练不同，不应把两种人在环方式混为一谈。")}
+<h2>4. 结果与边界</h2>
+<p>论文在咖啡、衣物折叠与纸盒装配等任务比较成功率和吞吐；在部分困难任务上报告吞吐超过2×、失败率约减半，并展示长时间部署。论文描述一次约13小时的咖啡运行，短片并非该完整记录。应按具体任务、迭代轮次、人工反馈与统计协议阅读，不推广成“全天绝不失败”或已经证明部署安全。</p>
+<h2>5. 研究者注记</h2>
+<blockquote>做后训练研究时，先固定奖励/终止协议、价值校准与数据配比，再比较无条件模仿、只用人工纠正、优势条件化和其他RL提取方式。价值估计不准、正标签过稀或分布外动作都可能影响改进。应报告人工接管、场景复位与额外数据成本，而不仅是最终成功率。</blockquote>
+<p><b>参考</b>：<a href="https://arxiv.org/html/2511.14759v2" target="_blank" rel="noopener">RECAP论文v2（IV、V、附录F）</a> · <a href="https://website.pi-asset.com/pi06star/PI06_model_card.pdf" target="_blank" rel="noopener">π0.6模型卡</a> · <a href="https://www.pi.website/blog/pistar06" target="_blank" rel="noopener">官方博客与演示</a>。</p>
 `
 },
 {
-  file: 'pi07', short: 'π0.7', kicker: '2026 · PHYSICAL INTELLIGENCE',
-  title: 'π0.7：可转向的通用主义模型（精读）', prev: 'pistar06', next: 'index',
-  body: `
+  file: "pi07",
+  short: "π0.7",
+  kicker: "2026 · PHYSICAL INTELLIGENCE",
+  title: "π0.7：可转向的通用主义模型（精读）",
+  prev: "pistar06",
+  next: "index",
+  body: String.raw`
 <p class="kicker">2026 · PHYSICAL INTELLIGENCE · STEERABLE GENERALIST</p>
 <h1>π0.7 精读</h1>
-<h2>1. 问题：组合泛化为什么在 VLA 里迟迟没出现</h2>
-<p>LLM 的标志性能力是<b>重组</b>：会英译法 + 会输出 JSON，就能输出 JSON 格式的翻译。VLA 能理解丰富的语义概念，却一直做不到“把学过的技能组合起来解决新任务”——比如用一件训练时没见过的厨房电器。此前哪怕训练中见过的技能，想用好也都要按任务微调，“通用模型开箱即专家”停留在愿景。π0.7（2026-04-16 发布）展示的正是这个愿景的第一批实证。</p>
-<h2>2. 方法精读：多样化上下文条件</h2>
-<p>核心论断：<b>naive 地混合多源数据不会带来好的泛化；泛化的关键是把“怎么做的差异”写进提示</b>。π0.7 的提示除语言指令外，还包括：</p>
+<h2>1. 问题：不只描述“做什么”，还要说明“怎么做”</h2>
+<p>π0.7把多样上下文作为利用异质数据的重要接口。训练数据来自多机器人、人类数据和自主经验，行为策略、质量与速度不同；直接混合可能产生冲突。提示显式说明任务、子任务和执行条件，有助于模型区分这些差异。<b>它不只是换了一段prompt</b>：论文同时描述了观测记忆、模型架构与训练数据配方，不能将所有收益单独归因于提示工程。</p>
+<h2>2. 方法精读：策略、记忆与外部子目标</h2>
+<h3>2.1 约5B动作策略与MEM式历史编码</h3>
+<p>论文Fig. 2给出Gemma3-4B初始化的VLM、约860M动作专家，以及对历史观察做时空压缩的MEM式编码器，动作策略总量约5B。历史与当前观察帮助处理部分可观测性。高层语义策略输出下一子任务；可选的世界模型生成多视角子目标。<b>世界模型是另一个模块，不包含在约5B动作策略的参数口径里</b>；图中BAGEL来源模型标为14B，不宜不加解释地称作“一个很小的模型”。</p>
+${FIG("pi07_architecture.png", "<b>论文Fig. 2原图 · 看清三个角色。</b> 上方是带记忆的动作策略；左下是高层语义策略或人类指令；右下是独立世界模型。视觉子目标是条件，不是已经验证可达、安全的动作计划。")}
+<h3>2.2 多样上下文的四类信息</h3>
 <ul>
-<li><b>子目标图像（subgoal images）</b>：定义“当前子步骤结束时物体该被摆成什么样”的精确空间布局；</li>
-<li><b>元数据（metadata）</b>：episode 的期望时长（做得多快）、质量标注（好/差）——次优的自主评测数据标注上“低质量/低速”后<b>就能入库而不会教坏模型</b>；</li>
-<li><b>策略描述</b>：文本化的执行策略。</li>
+<li><b>语言与子任务</b>：总目标之外说明当前步骤、策略或细粒度要求。</li>
+<li><b>视觉子目标</b>：多视角近未来场景，为空间关系和操作结果补充视觉条件。</li>
+<li><b>episode元数据</b>：描述质量、长度/速度等差异，让次优经验有可区分的条件。它不是自动消除坏数据影响的“消毒剂”。</li>
+<li><b>控制模态</b>：标明关节或末端等控制接口，避免不同动作语义在训练中被误当成同一种量。</li>
 </ul>
-<p>测试时模型接受标准语言指令，但也接受期望策略信息、甚至由<b>轻量世界模型合成的视觉子目标</b>——世界模型在这里的角色是“提示生成器”，为没有真值子目标的任务提供视觉条件。</p>
-${animSteer}
-${animWorld}
-<h2>3. 数据侧：把 π*0.6 的经验变成通用训练数据</h2>
-<p>训练数据横跨<b>多机器人、人类数据、以及各策略跑出的自主 episode</b>。关键的缝合技巧：把 π*0.6 经 RECAP 产生的自主经验<b>带策略元数据（strategy metadata）蒸馏进 π0.7</b>——同一批“特化模型的经验”就这样变成“通用模型的通识”。</p>
-${FIG('pi07_subgoal_1.png', '<b>图 · 子目标图像（期望终态）</b>（图片来源：Physical Intelligence 官方博客 <i>π0.7</i>，版权归原作者）', 'duo')}
-${FIG('pi07_current_1.png', '<b>图 · 当前观测（起始状态）</b>：条件 = 语言 + 子目标 + 元数据（图片来源同上）', 'duo')}
-${FIG('pi07_subgoal_3.png', '<b>图 · 另一组子目标示例</b>（图片来源同上）', 'duo')}
-${FIG('pi07_current_3.png', '<b>图 · 对应当前观测</b>（图片来源同上）', 'duo')}
-<h2>4. 三个涌现能力与数字</h2>
-<h3>4.1 开箱即专家</h3>
-<p>在叠衣（T-Shirts & Shorts / Diverse-Hardest Item 两档难度）、咖啡制作、装盒任务组上，单个 π0.7 的吞吐（按专家特化模型归一化）达到<b>持平或更高</b>，成功率相当——即“通用模型 ≥ 特化模型”，这是“开箱即专家”主张的直接证据。</p>
-<h3>4.2 语言教练（language coaching）：三段递进</h3>
-<p>面对没见过的厨房电器（空气炸锅），π0.7 展示了一条清晰的能力养成路径：①<b>零样本尝试</b>——只给指令，机器人几次试错后完成部分任务但未完成全部；②<b>逐步语言纠正</b>（verbal coaching）——像指导第一次用电器的人一样给细粒度指令，任务完整完成；③<b>多次教练后微调高层策略</b>——把教练指令用于微调生成语言子目标的高层策略，此后<b>无需任何遥操作或纠正</b>即可全自主执行，“机器人实际上从语言教练那里学会了任务”。</p>
-${VID('pi07_coaching.mp4', '<b>视频 · 空气炸锅任务的语言教练与子目标可视化</b>（视频来源：Physical Intelligence 官方博客 <i>π0.7</i>，版权归原作者）')}
-<h3>4.3 零样本跨本体</h3>
-<p>训练集中最欠 represented 的本体之一是<b>双臂 UR5e 系统</b>（两台 UR5e 工业臂 + Robotiq 平行夹爪）——臂重大惯量大、夹爪精度低、极难遥操作。π0.7 在这台机器人上零样本叠衣（无任何该本体的叠衣数据），成功率<b>与“首次在这台机器人上做该任务的人类专家遥操作者”持平</b>。</p>
-${VID('pi07_shirt_fold.mp4', '<b>视频 · 零样本跨本体衬衫折叠（双臂 UR5e）</b>（视频来源同上）')}
+<p>训练会随机省略部分条件，使模型可以接受不同组合；这不意味着所有未知条件或错误子目标都能可靠处理。世界模型生成视觉条件，与动作策略执行后的真实观察更新，仍构成有误差的闭环。</p>
+${PAIR("pi07_current_1.png", "pi07_subgoal_1.png", "<b>官方博客样例 · 当前观察（左）与视觉子目标（右）。</b> 子目标描述希望看到的状态，不应把两帧差直接当成机器人可执行轨迹。")}
+${PAIR("pi07_current_3.png", "pi07_subgoal_3.png", "<b>另一组官方视觉条件样例。</b> 对照物体/手部空间关系阅读；单组图片不证明可达性或覆盖全部相机。")}
+<h2>3. 数据与组合：怎样复用专家经验？</h2>
+<p>作者把RECAP专家产生的经验连同策略/质量等元数据纳入通用训练，并结合更广的机器人与非机器人数据。模型学习在指定条件下生成动作，而不是对所有不同质量行为无条件求平均。数据多样性和条件化的作用需要通过消融区分；“可以使用次优数据”不等于无需清洗、评测或标注。</p>
+<h2>4. 三类实验，三种“零样本”边界</h2>
+<h3>4.1 已学任务上的通用模型与专家比较</h3>
+<p>在作者所测的折衣、咖啡与装盒任务上，单个π0.7与相应RECAP特化策略达到相近的成功率和吞吐，部分任务更高。这说明该组任务上的经验能够整合，不是“任意任务通用模型都优于专家”，也不是所有任务都未见过训练数据。</p>
+<h3>4.2 语言教练与之后的自主执行</h3>
+<p>未见的长程任务不一定只给一句话就完成。空气炸锅示例包含零样本尝试、实时语言指导，以及使用指导轨迹中的子任务序列训练高层策略的后续实验。<b>实时教练不是完全自主，教练后训练也不是零额外数据</b>；作者强调的是不需要为这些新任务再收集低层遥操作动作。要区分人的语言反馈与RECAP的遥操作接管。</p>
+${VID("pi07_coaching.mp4", "<b>官方视频 · 粗粒度语言教练。</b> 画面包含人类指令；这不是自动生成子目标的可视化，也不是无人干预的演示。视频自带1×标识，本站不再加速。")}
+<h3>4.3 未见“本体×任务”组合的折叠迁移</h3>
+<p>双臂UR5e实验没有该本体的衬衫折叠训练数据，但不表示模型从未见过UR5e或衣物折叠。论文报告π0.7成功率80%，对比首次在该平台折叠的人类专家约80.6%；还需结合试验协议与任务进度理解，不能等同普遍达到人类水平。下面采用官方带子目标叠加的片段，明确其条件设置。</p>
+${VID("pi07_transfer_official.mp4", "<b>官方动态演示 · 双臂UR5e衬衫折叠与子目标叠加。</b> 零样本针对未见的本体—任务组合；子目标是方法提供的辅助条件，视频不是所有任务/所有本体的性能证明。")}
 <h2>5. 研究者注记</h2>
-<blockquote>①π0.7 的深层主张是数据护城河的重新定义：泛化不靠“更多同质数据”，靠“条件化消化异质数据”——低质量数据从负资产变成（带标注的）资产，数据工程的重心从“采好数据”移到“把数据之间的差异写清楚”。②世界模型路线之争在这里被降维：世界模型不必是“另一个大模型路线”，它可以是 VLA 的子目标生成器——一条轻量的融合路径。③语言教练的三段递进（零样本→教练→微调高层）是“人在环”数据收集的新范式：人的参与从遥操作降级为说话。④开放问题：子目标合成的保真度成为新上界；元数据标注从哪来（人工/自动评测）是数据管线的下一个瓶颈。</blockquote>
-<p><b>参考</b>：Physical Intelligence, <i>π0.7: a Steerable Generalist Robotic Foundation Model with Emergent Capabilities</i>（<a href="https://www.pi.website/blog/pi07" target="_blank" rel="noopener">官方博客</a>，2026-04-16）</p>
+<blockquote>可分别研究记忆、语义子任务、视觉子目标和质量条件。测试时固定是否允许语言教练、是否调用世界模型以及数据包含哪些本体—任务组合；成本比较要把外部模型的计算也计入。核心开放问题包括条件错误、子目标不可达、历史压缩丢失接触信息，以及低质量数据标注失准后的闭环表现。</blockquote>
+<p><b>参考</b>：<a href="https://www.pi.website/download/pi07.pdf" target="_blank" rel="noopener">π0.7论文（Fig. 2、实验与附录）</a> · <a href="https://www.pi.website/blog/pi07" target="_blank" rel="noopener">官方博客，2026-04-16</a>。</p>
 `
 },
 {
-  file: 'credits', short: 'Credits', title: 'Credits 与版权说明',
-  body: `
+  file: "credits",
+  short: "Credits",
+  title: "Credits 与版权说明",
+  body: String.raw`
 <p class="kicker">ASSETS & LICENSES</p>
 <h1>Credits</h1>
-<p>本站<b>文字与自制 SVG 动画</b>由本仓库独立撰写，以 MIT 协议提供。以下论文图、官方图与视频的版权归原作者所有，此处仅作研究性引用并逐条署名；引用方式为下载副本嵌入并注明出处。</p>
+<p>本站文字为原创研究笔记。下列图片、动图和视频来自论文或作者公开项目，不把素材中的实验当作本站测量，也不把自绘轨迹冒充真实模型行为。<b>本次保留原有Claude风格，仅修改媒体与讲解内容</b>；论文图中的字体、颜色与标注保持原貌。</p>
+<p>每个视频使用本地文件与原生播放控件，默认暂停；poster来自对应片段，不用其他模型的画面占位。官方GIF仅转码以支持暂停和拖动，不改播放速度。源文件已有的加速、拼接和条件以作者说明为准。</p>
 <table>
-<tr><th>资产</th><th>来源</th><th>版权</th></tr>
-<tr><td>dp_teaser.png, dp_policy_input_output.png</td><td>arXiv:2303.04137（Diffusion Policy, Chi et al., RSS 2023）</td><td>© 论文作者</td></tr>
-<tr><td>dp_multimodal_sim.png</td><td><a href="https://github.com/real-stanford/diffusion_policy" target="_blank" rel="noopener">real-stanford/diffusion_policy</a> media/（MIT License）</td><td>© 论文作者</td></tr>
-<tr><td>pi0_overview.png, pi0_teaser.png</td><td>arXiv:2410.24164（π0, Physical Intelligence）</td><td>© Physical Intelligence</td></tr>
-<tr><td>smolvla_arch.png, smolvla_async.png, smolvla_tasks.png</td><td>arXiv:2506.01844 / HF 博客（SmolVLA, Hugging Face）</td><td>© Hugging Face</td></tr>
-<tr><td>lerobot_so100.webp</td><td><a href="https://github.com/huggingface/lerobot" target="_blank" rel="noopener">huggingface/lerobot</a> media/readme/（Apache-2.0）</td><td>© Hugging Face</td></tr>
-<tr><td>pi05_verbal/subtask/detection/web.jpg</td><td>PI 官方博客《π0.5》（pi.website/blog/pi05）+ arXiv:2504.16054</td><td>© Physical Intelligence</td></tr>
-<tr><td>pistar06_coffee.mp4</td><td>PI 官方博客《π*0.6》（pi.website/blog/pistar06）</td><td>© Physical Intelligence</td></tr>
-<tr><td>pi07_subgoal/current_*.png, pi07_coaching.mp4, pi07_shirt_fold.mp4</td><td>PI 官方博客《π0.7》（pi.website/blog/pi07）</td><td>© Physical Intelligence</td></tr>
+<tr><th>素材</th><th>原始出处</th><th>处理与归属</th></tr>
+${creditRows}
 </table>
-<p>如你是权利人并希望移除某项资产，请开 issue，我们会立即处理。</p>
+<p>机器可读的来源、文件校验值与处理记录见 <a href="https://github.com/JaleWang-BUPT/vla-models-explained/blob/main/media-provenance.json" target="_blank" rel="noopener">media-provenance.json</a>。早期图片副本未保存原始下载地址时，标明对应论文/博客，不补造精确下载记录。</p>
+<p>代码与本站原创文字使用MIT许可；引用媒体的版权归各自权利人，仓库代码许可证不自动覆盖这些媒体。若需移除某项引用，请在GitHub提交issue。</p>
 `
 }
 ];

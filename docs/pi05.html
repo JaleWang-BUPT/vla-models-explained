@@ -76,67 +76,33 @@ p,li,figcaption{overflow-wrap:anywhere}
 
 <p class="kicker">2025 · PHYSICAL INTELLIGENCE</p>
 <h1>π0.5 精读</h1>
-<h2>1. 问题：场景级泛化</h2>
-<p>π0 时代（含同期所有 VLA）的评测环境都与训练环境高度相似；商业机器人因此只敢进工厂和仓库。π0.5 把目标定为<b>在从未见过的家庭里完成长程任务</b>——收拾厨房（关柜门、把物品放进水槽）、收拾卧室（捡起地上所有衣服）——并且明确声明：目标不是新技能或更高灵巧度，而是<b>泛化本身</b>。训练演示仍然“通常短于一分钟、成功率不高”，泛化不是靠完美数据堆出来的。</p>
-<h2>2. 方法精读：共训 + 混合多模态样本 + 分层微调</h2>
-<p>π0.5 采用简单而清晰的<b>分层架构</b>：先在异构混合任务上预训练，再针对移动操作微调——微调数据同时含<b>底层动作样本</b>与<b>高层“语义”动作</b>（预测“pick up…”这类子任务标签）。推理时模型<b>先推断高层子任务，再以子任务为条件预测连续动作</b>（动作解码仍是 flow matching）。核心观察：VLA 继承自 VLM，训练样本可以是“图像、文本、检测框、动作”的任意组合——于是 π0.5 把共训做到了 VLM 数据之外：</p>
-
-<div class="anim">
-<svg viewBox="0 0 640 240" role="img" aria-label="异构共训动画">
-<defs>
-  <linearGradient id="gT" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e08a68"/><stop offset="1" stop-color="#c96442"/></linearGradient>
-  <linearGradient id="gG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8aa471"/><stop offset="1" stop-color="#71855c"/></linearGradient>
-  <linearGradient id="gA" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b98a4a"/><stop offset="1" stop-color="#a1732c"/></linearGradient>
-  <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-  <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse"><circle cx="1.6" cy="1.6" r="1.2" fill="#ded8ca"/></pattern>
-</defs>
-<rect x="1.5" y="1.5" width="637" height="237" rx="14" fill="#fdfcf9" stroke="#e5e1d8"/><rect x="1.5" y="1.5" width="637" height="237" rx="14" fill="url(#dots)" opacity="0.5"/>
-  <defs><path id="f1" d="M170,60 C300,60 330,95 430,110"/><path id="f2" d="M170,105 C300,105 340,112 430,118"/><path id="f3" d="M170,150 C300,150 340,128 430,126"/><path id="f4" d="M170,195 C300,195 330,140 430,134"/></defs>
-  
-    <rect x="20" y="46" width="150" height="34" rx="9" fill="#f6f4ee" stroke="#d9d3c5"/>
-    <text x="95" y="68" text-anchor="middle" font-size="13" fill="#1f1e1d">多本体真机演示</text>
-    <use href="#f1" stroke="url(#gT)" stroke-width="2.2" fill="none" stroke-dasharray="7 8">
-      <animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.6s" repeatCount="indefinite"/>
-    </use>
-    <rect x="20" y="91" width="150" height="34" rx="9" fill="#f6f4ee" stroke="#d9d3c5"/>
-    <text x="95" y="113" text-anchor="middle" font-size="13" fill="#1f1e1d">网络多模态数据</text>
-    <use href="#f2" stroke="url(#gT)" stroke-width="2.2" fill="none" stroke-dasharray="7 8">
-      <animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.6s" repeatCount="indefinite"/>
-    </use>
-    <rect x="20" y="136" width="150" height="34" rx="9" fill="#f6f4ee" stroke="#d9d3c5"/>
-    <text x="95" y="158" text-anchor="middle" font-size="13" fill="#1f1e1d">语义标注（检测/指代）</text>
-    <use href="#f3" stroke="url(#gT)" stroke-width="2.2" fill="none" stroke-dasharray="7 8">
-      <animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.6s" repeatCount="indefinite"/>
-    </use>
-    <rect x="20" y="181" width="150" height="34" rx="9" fill="#f6f4ee" stroke="#d9d3c5"/>
-    <text x="95" y="203" text-anchor="middle" font-size="13" fill="#1f1e1d">高层子任务标注</text>
-    <use href="#f4" stroke="url(#gT)" stroke-width="2.2" fill="none" stroke-dasharray="7 8">
-      <animate attributeName="stroke-dashoffset" from="60" to="0" dur="1.6s" repeatCount="indefinite"/>
-    </use>
-  <rect x="430" y="86" width="170" height="76" rx="14" fill="#ffffff" stroke="#c96442" stroke-width="2"/>
-  <text x="515" y="118" text-anchor="middle" font-size="15" fill="#1f1e1d">VLA 共训</text>
-  <text x="515" y="142" text-anchor="middle" font-size="12" fill="#6e6b64">动作 + 文本 + 检测 + 指代</text>
-  <text x="60" y="232" font-size="12.5" fill="#87847e">混合训练让一个模型既会“做”，也懂任务的语义结构与高层步骤</text>
-</svg></div>
-<p>此前工作已证明“混入 VLM 训练数据”能改善对新物体/新背景的泛化；π0.5 更进一步，设计了<b>混合多模态样本</b>（hybrid multimodal）：一条样本同时含图像观测、语言命令、物体检测、语义子任务预测与底层动作。官方博客把提示/标注形态画成四类，正对应本站下载的四张官方图：</p>
-<figure class="duo"><img src="./assets/pi05_verbal.jpg" loading="lazy" alt=""><figcaption><b>图 1 · 语言指令条件</b>（图片来源：Physical Intelligence 官方博客 <i>π0.5</i>，版权归原作者）</figcaption></figure>
-<figure class="duo"><img src="./assets/pi05_subtask.jpg" loading="lazy" alt=""><figcaption><b>图 2 · 高层子任务命令</b>（图片来源同上）</figcaption></figure>
-<figure class="duo"><img src="./assets/pi05_detection.jpg" loading="lazy" alt=""><figcaption><b>图 3 · 物体检测/指代标注</b>（图片来源同上）</figcaption></figure>
-<figure class="duo"><img src="./assets/pi05_web.jpg" loading="lazy" alt=""><figcaption><b>图 4 · 网络多模态数据</b>（图片来源同上）</figcaption></figure>
-<h3>2.1 实现细节里值得抄的三处</h3>
-<ul>
-<li>所有动作数据<b>按数据集各自的 1%/99% 分位归一化到 $[-1,1]$</b>；动作维度取全体数据集的最大维，低维本体 padding——跨本体数据的统一接口做法。</li>
-<li>语义命令以特定标记（如 <code>' > '</code>）追加到文本提示里，让“子任务预测”与“语言跟随”在同一模板下共存。</li>
-<li>评测用<b>部分得分</b>（partial credit）评分细则（附录 A-B 的任务评分 rubric）：把一半盘子放进水槽记约 50%——长程任务的成功率统计必须有这类协议，否则数字没有意义。</li>
-</ul>
+<h2>1. 问题：换一个家庭，原来会的技能还能用吗？</h2>
+<p>π0.5重点研究训练中未见家庭里的长程操作：任务需要的不仅是抓取动作，还包括识别物体用途、理解场景和选择下一子任务。这里的“开放世界泛化”有具体实验定义，不能直接翻译成任意陌生环境、任意新技能都能零样本成功。数据多样性、训练目标与高层决策共同构成方法，而不只是“把π0训练得更久”。</p>
+<h2>2. 方法精读：异构数据与混合动作表示</h2>
+<h3>2.1 不是每条样本都有完整动作标签</h3>
+<p>配方连接跨机器人动作数据、不同环境的机器人数据、高层语义任务以及网络视觉语言任务。不同样本可监督不同输出：描述、检测/指代、语义子任务或低层动作。<b>没有机器人动作标签的web样本，不等于补一个零动作当监督</b>；需要在共同序列接口里明确每种样本的目标与loss mask。</p>
+<figure class="duo"><img src="./assets/pi05_verbal.jpg" loading="lazy" decoding="async" alt="π0.5 训练中的语言指令样本"><img src="./assets/pi05_subtask.jpg" loading="lazy" decoding="async" alt="π0.5 训练中的语义子任务样本"><figcaption><b>官方训练样例 · 左：语言指令；右：语义子任务。</b> 它们说明条件与监督的形态，不证明每条训练样本同时具备所有模态。<br>来源：<a href="https://www.pi.website/blog/pi05" target="_blank" rel="noopener">π0.5 官方博客</a> · © Physical Intelligence</figcaption></figure>
+<figure class="duo"><img src="./assets/pi05_detection.jpg" loading="lazy" decoding="async" alt="π0.5 训练中的检测或指代标注样本"><img src="./assets/pi05_web.jpg" loading="lazy" decoding="async" alt="π0.5 训练中的网络多模态样本"><figcaption><b>官方训练样例 · 左：检测/指代；右：网络多模态任务。</b> 研究重点是如何共享表示，同时保留任务对应的监督边界。<br>来源：<a href="https://www.pi.website/blog/pi05" target="_blank" rel="noopener">π0.5 官方博客</a> · © Physical Intelligence</figcaption></figure>
+<h3>2.2 FAST离散训练与连续动作专家</h3>
+<p>原论文的重要设计是结合<b>FAST动作token预测</b>与<b>flow matching动作专家</b>。离散训练便于沿用token预测配方，连续专家用于较快地产生动作块；两种动作表示通过attention mask隔离，避免真值token向带噪动作分支泄漏。抽象地可写 $L=L_{\rm CE}+\alpha L_{\rm FM}$，但不能据此假定每个阶段、每种样本都同时计算两项。</p>
+<p>论文IV节的分阶段方案先进行离散token预训练，再加入连续动作专家做后训练；具体公开checkpoint可能使用更新过的配方，复现应固定版本。<b>把π0.5只概括为“π0加web数据”会漏掉训练效率与动作表示这部分贡献。</b></p>
+<h3>2.3 高层先选择子任务，低层再执行动作</h3>
+<p>同一模型可先预测语义子任务 $\hat\ell_t$，再生成 $p(A_t\mid o_t,\ell,\hat\ell_t)$。例如总任务是清理厨房，当前子任务可能是拿起盘子。高层不是必须独立部署的另一个大模型，也不是先生成一串语言就自动获得长程规划保证；子任务更新频率、低层执行窗口和失败恢复仍需要设计。</p>
+<figure><video controls playsinline loop preload="metadata" poster="./assets/pi05_plate_1x-poster.jpg" aria-label="π0.5 官方擦干盘子并放到沥水架演示"><source src="./assets/pi05_plate_1x.mp4" type="video/mp4">浏览器不支持此视频，请<a href="./assets/pi05_plate_1x.mp4" target="_blank" rel="noopener">打开媒体文件</a>。</video><figcaption><b>官方视频 · 擦干盘子并放上沥水架，源文件标为1×。</b> 观察抓取、工具使用和阶段衔接；该片是行为示例，完整泛化结论仍来自论文的未见家庭评测。<br>来源：<a href="https://www.pi.website/blog/pi05" target="_blank" rel="noopener">π0.5 官方博客</a> · © Physical Intelligence · <a href="https://website.pi-asset.com/pi0_5/impressive-tasks/1x_dry_plate_on_dishrack_with_audio_lowres.mp4" target="_blank" rel="noopener">原始文件</a><br>点击播放，可暂停、拖动进度或全屏；本站不自动播放，也不额外加速。</figcaption></figure>
 <h2>3. 结果与消融</h2>
-<p>评测在多个<b>训练时完全没见过的家庭</b>进行。三个系统性结论：①<b>泛化随训练地点数稳步上升</b>（语言跟随实验：随训练场景增加，对已见/未见物体类别的成功率都持续提高——场景多样性是可积累的资产）；②<b>共训配方消融</b>（V-C 节）逐一验证语义预测、web 数据等成分的边际贡献；③<b>高层推理消融</b>（V-E 节）：去掉子任务预测，长程任务的阶段衔接明显变差。任务从“把盘子放进水槽”到“用海绵擦溅洒”，失败常见但展现出类人的灵活应变。</p>
-<h2>4. 研究者注记</h2>
-<blockquote>①π0.5 把“数据工程”变成“接口工程”：难点不在收集更多数据，而在让异质数据共享同一个序列模板。②子任务先行的两阶段推理是分层策略的最小实现——不引入额外模型，只是让 VLM 部分先说一句话。③它仍然只解决“见过类似技能在新场景执行”；π0.7 的组合泛化（没见过的电器）是下一层。</blockquote>
-<p><b>参考</b>：Physical Intelligence, <i>π0.5: a Vision-Language-Action Model with Open-World Generalization</i>（<a href="https://arxiv.org/abs/2504.16054" target="_blank" rel="noopener">arXiv:2504.16054</a> · <a href="https://www.pi.website/blog/pi05" target="_blank" rel="noopener">官方博客</a>）</p>
+<p>对照论文V节分别看新家庭任务进度、训练地点规模、各类共训数据消融与高层推理消融。地点更多与表现提高的曲线，不证明仅靠地点数量即可泛化；去掉web数据、跨本体数据或高层监督的效果也依任务而变。长程任务常用<b>部分进度评分</b>，其平均分不能直接写成整任务成功率。</p>
+<h2>4. 训练与实现：最先核对的接口</h2>
+<ul>
+<li><b>动作归一化</b>：固定采用均值方差还是分位数、统计对应哪份数据；padding维与有效mask必须一致。</li>
+<li><b>多模态监督</b>：记录FAST目标、高层子任务和连续专家分别在哪些样本/阶段启用，避免标签与attention泄漏。</li>
+<li><b>部署协议</b>：写清高层是否自动产生、是否有人提供子任务、如何重新观测和判定失败。</li>
+</ul>
+<h2>5. 研究者注记</h2>
+<blockquote>可研究的不是抽象的“更多数据”，而是迁移路径：哪类辅助任务改善哪种泛化？语义子任务带来的是语言理解、阶段切换还是更好的数据划分？用固定机器人数据和训练预算的消融拆开回答。相机视角、动作语义与监督模板都是接口条件，不应默认为跨数据集天然一致。</blockquote>
+<p><b>参考</b>：<a href="https://arxiv.org/html/2504.16054v1" target="_blank" rel="noopener">π0.5论文v1（IV、V、附录）</a> · <a href="https://www.pi.website/blog/pi05" target="_blank" rel="noopener">官方博客与公开视频</a> · <a href="https://github.com/Physical-Intelligence/openpi" target="_blank" rel="noopener">公开实现</a>。</p>
 
 <nav class="model-nav"><span><a href="./pi0.html">← π0</a></span><span><a href="./smolvla.html">SmolVLA →</a></span></nav>
 </main>
-<footer><div>本站是研究笔记，非官方资料；方法描述以各论文/官方博客为准，图片与视频版权归原作者（见各图注与 <a href="./credits.html">Credits</a>）。文本与自制动画以 MIT 协议提供 · <a href="https://github.com/JaleWang-BUPT/vla-models-explained" target="_blank" rel="noopener">GitHub 仓库</a></div></footer>
+<footer><div>本站是研究笔记，非官方资料；方法描述以各论文/官方博客为准，图片与视频版权归原作者（见各图注与 <a href="./credits.html">Credits</a>）。本站文字与代码以 MIT 协议提供；引用媒体不在此授权范围内 · <a href="https://github.com/JaleWang-BUPT/vla-models-explained" target="_blank" rel="noopener">GitHub 仓库</a></div></footer>
 </body>
 </html>
