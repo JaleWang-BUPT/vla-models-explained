@@ -153,7 +153,7 @@ p,li,figcaption{overflow-wrap:anywhere}
 </table>
 <p>看官方四联动图时，先暂停辨认每个面板的实验条件，再观察等待间隙与扰动响应。该片段适合找行为现象，不适合直接把像素运动速度换算成论文的成功率、任务吞吐或GPU加速比。</p>
 <blockquote>复现的最小日志应同时能回答：这条动作来自哪个观测、哪个请求、哪个chunk位置，真正执行于何时？如果只有推理开始/结束时间，就很难定位异步系统中的陈旧动作与队列错误。</blockquote>
-<div class="note">进阶推导与研究实践（11–20节）：继续展开生成数学、数据与代码契约、失败诊断和可复现实验。通用推导、教学数值、研究方案与论文报告分别标明；没有在本站执行新的模型训练或真机实验。此处重引原论文/官方图以方便就近对照，不重绘素材。</div><h2 id="smol-prefix-cache">11. 前缀缓存逐步阅读：为什么要清掉上一轮动作K/V</h2>
+<div class="note">进阶推导与研究实践（11–24节）：继续展开生成数学、数据与代码契约、失败诊断和可复现实验。通用推导、教学数值、研究方案与论文报告分别标明；没有在本站执行新的模型训练或真机实验。此处重引原论文/官方图以方便就近对照，不重绘素材。</div><h2 id="smol-prefix-cache">11. 前缀缓存逐步阅读：为什么要清掉上一轮动作K/V</h2>
 
 <p>在一次动作块生成中，图像、语言与状态前缀固定，带噪动作随flow积分改变。先计算前缀的K/V，再让动作专家在各生成时间读取，可以避免重复编码条件。这里的“过去”有两种：真实观察历史，以及上一轮生成迭代；后者通常不能自动作为新的序列上下文保留下来。</p>
 <figure><img src="./assets/smolvla_arch.png" alt="SmolVLA 的视觉语言前缀与交错注意力动作专家架构" loading="lazy" decoding="async"><figcaption><b>原图回看。</b> 从VLM特征到交错专家层逐条阅读。前缀状态可缓存，不意味着每次物理观察都能跳过VLM；新的观察需要建立新的条件表示。<br>来源：<a href="https://huggingface.co/blog/smolvla" target="_blank" rel="noopener">SmolVLA 官方博客 Figure 2</a> · © Hugging Face / SmolVLA authors。沿用原文件，未重绘。</figcaption></figure>
